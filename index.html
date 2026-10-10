@@ -1,0 +1,2478 @@
+<!doctype html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8">
+<title>工作日誌</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F4F1EA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="工作日誌">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<script>window.WORKLOG_API = 'https://assistant-app.cbcb411012.workers.dev/'; window.WORKLOG_VERSION = '3.7.6'; if ('serviceWorker' in navigator && location.hostname !== 'localhost') navigator.serviceWorker.register('sw.js');</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@300;400;500&family=Martian+Mono:wght@300;400&display=swap">
+<style>
+/* v3「助理」：跟助理 App 同一套。米白木漏れ日、背景是呼吸的霧；青磁只給能點的主要動作；
+   她的聲音（標題、空狀態）用宋體，介面用黑體，數字用等寬字。圓角膠囊、細線、沒有陰影堆疊。
+   刻意只做淺色（使用者指定米白定調）。v2 P5 的樣式留在 git 歷史（v2.15.2）。 */
+:root{
+  --bg:#F4F1EA; --surf:#FBF9F4; --ink:#22251F; --soft:#4C5047; --mute:#6E7068; --line:#DCD7CB; --mark:rgba(34,37,31,.07);
+  --acc:#2F6B5F; --on-acc:#F5F3EC; --warn:#A4482E; --good:#3F6B3A;
+  --f-voice:"Noto Serif TC","PMingLiU",serif; --f-ui:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; --f-num:"Martian Mono",ui-monospace,monospace;
+  --calm:cubic-bezier(.4,0,.2,1); --in:cubic-bezier(.4,0,1,1);
+  --r-lg:28px; --r-sm:16px; --lift:0 24px 60px -32px rgba(34,37,31,.45);
+  --tile:color-mix(in srgb,var(--surf) 90%,transparent);
+  color-scheme:light;
+}
+*{box-sizing:border-box;scrollbar-width:thin;scrollbar-color:rgba(34,37,31,.18) transparent}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-thumb{background:rgba(34,37,31,.18);border-radius:6px}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.6 var(--f-ui);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;min-height:100vh}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:0;padding:0;text-align:inherit}
+input,textarea{font-size:16px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:3px;border-radius:10px}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+a{color:var(--acc)}
+#fog{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+main,#rail,.nav{position:relative;z-index:1}
+@keyframes rise{from{opacity:0;transform:translateY(12px);filter:blur(6px)}}
+@keyframes fade{from{opacity:0}}
+@keyframes sink{to{opacity:0;transform:translateY(10px);filter:blur(4px)}}
+
+/* ---------- 版面 ---------- */
+main#view{max-width:760px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top,0px)) 16px 120px}
+.view-in{animation:rise 420ms var(--calm) both}
+.view-out{animation:sink 180ms var(--in) forwards}
+.band{margin:0 0 14px}
+.wrap{display:flex;flex-direction:column;gap:14px}
+.ttl{margin:6px 0 2px;font:300 clamp(34px,6vw,48px)/1.15 var(--f-voice);letter-spacing:.06em}
+.ttl.md{font-size:clamp(26px,4vw,34px)}
+.ttl.anim{animation:rise 640ms var(--calm) both}
+.lead,.aside{margin:0;font:400 16px/1.8 var(--f-voice);color:var(--soft)}
+.mast{padding:30vh 0 0;text-align:center}
+.spacer{display:none}
+#rail{display:none}
+
+/* 底部導覽（手機）：一顆膠囊浮在霧上 */
+.nav{position:fixed;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:10;display:flex;justify-content:center;pointer-events:none}
+.nav-in{pointer-events:auto;display:flex;gap:2px;padding:5px;border-radius:999px;background:color-mix(in srgb,var(--surf) 84%,transparent);box-shadow:inset 0 0 0 1px var(--line),var(--lift);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.nav-in button{min-height:44px;padding:0 18px;border-radius:999px;font-size:15px;color:var(--soft);transition:background-color 180ms var(--calm),color 180ms var(--calm)}
+.nav-in button:hover{color:var(--ink);background:var(--mark)}
+.nav-in button[aria-current="page"]{background:var(--ink);color:var(--bg)}
+.side-brand{display:none}
+
+/* ---------- 共用元件 ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:999px;background:var(--acc);color:var(--on-acc);font-size:15px;font-weight:500;white-space:nowrap;transition:transform 180ms var(--calm),background-color 180ms var(--calm)}
+.btn:active{transform:scale(.96)}
+.btn.ghost{background:color-mix(in srgb,var(--surf) 85%,transparent);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.btn.ghost:hover{background:var(--surf)}
+.btn.sm{min-height:36px;padding:0 14px;font-size:14px}
+.danger{min-height:36px;padding:0 14px;border-radius:999px;color:var(--warn);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 40%,transparent);font-size:14px}
+.danger.arm{background:var(--warn);color:var(--surf);box-shadow:none}
+.plate{display:inline-block;background:var(--mark);padding:0 8px;border-radius:6px;font-weight:500;margin-right:6px;line-height:1.6}
+.stamp{font:300 13px/1.6 var(--f-num);color:var(--soft);white-space:nowrap}
+.stamp.lg{font-size:15px;color:var(--ink)}
+.tag,.flag,.cat-tag,.st-tag,.state{display:inline-flex;align-items:center;min-height:22px;padding:0 9px;border-radius:999px;font-size:12px;font-weight:500;white-space:nowrap;box-shadow:inset 0 0 0 1px var(--line);color:var(--soft);vertical-align:1px}
+.state.doing,.dark-tag{background:var(--ink);color:var(--bg);box-shadow:none}
+.flag{color:var(--warn);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 45%,transparent)}
+.flag.done{color:var(--good);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--good) 45%,transparent)}
+.tag.warn{color:var(--warn)}
+.st-tag{margin-right:6px}
+.hint{margin:0;font-size:13px;color:var(--soft)}
+.co-row{display:flex;gap:8px;align-items:center}.co-row input{flex:1;min-width:0}.co-row .btn{flex:none}
+.co-note:empty{display:none}.co-note{margin-top:6px}
+.co-list{display:grid;gap:6px;margin-top:6px}.co-list:empty{display:none}
+.co-item{display:block;width:100%;text-align:left;padding:10px 14px;border-radius:var(--r-sm);background:var(--surf);box-shadow:inset 0 0 0 1px var(--line);transition:box-shadow 180ms var(--calm)}
+.co-item:hover,.co-item:focus-visible{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.co-item b{display:block;font-weight:500}.co-item span{display:block;font-size:13px;color:var(--soft)}.co-item i{font-style:normal;font-family:var(--f-num)}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:40;transform:translateX(-50%);max-width:calc(100vw - 32px);background:var(--ink);color:var(--bg);padding:11px 22px;border-radius:999px;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:rise 320ms var(--calm) both}
+.sync{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:14px;z-index:15;font-size:12px;color:var(--soft);background:var(--tile);padding:3px 12px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line)}
+.fx{display:none}
+.tile,.bubble,.today-col,.tc,.ph,.strip,.c-log,.rc,.wk-paper,.cd-card,.cd-sec,.filters,.cl-tools,.tray,.m-sec,.pend,.cal{background:var(--tile);border-radius:var(--r-lg);box-shadow:inset 0 0 0 1px var(--line)}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.clamp3{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.open .clamp2,.open .clamp3{display:block;-webkit-line-clamp:unset}
+.more-t{display:inline-block;margin-left:6px;font-size:12px;color:var(--acc)}
+.open .more-t{display:none}
+.c-more{min-height:36px;padding:0 12px;border-radius:999px;font-size:14px;color:var(--acc)}
+
+/* ---------- 快記 ---------- */
+.bubble{display:block;padding:18px 20px 14px;margin:0}
+.bubble-in{display:flex;flex-direction:column;gap:6px}
+.nameplate{font-size:13px;color:var(--soft);letter-spacing:.1em}
+.tail{display:none}
+.dlg{display:flex;flex-direction:column;gap:10px}
+.typebox{position:relative;border-radius:var(--r-sm);background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);padding:8px 12px;transition:box-shadow 180ms}
+.typebox:focus-within{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.typebox textarea,.mirror{font:400 17px/1.9 var(--f-ui);letter-spacing:.02em;padding:4px 2px;margin:0;border:0;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;text-align:left}
+.typebox textarea{display:block;width:100%;min-height:112px;resize:none;overflow:hidden;background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:transparent;outline:0}
+.mirror{position:absolute;inset:8px 12px;pointer-events:none;color:var(--ink);overflow:hidden;background:var(--bg)}
+.mirror .sel{background:rgba(47,107,95,.18)}
+.ch{display:inline-block}
+.ch.t-paper{background:var(--mark);border-radius:4px;font-weight:500}
+.ch.t-red{box-shadow:inset 0 -2px 0 var(--ink);font-weight:500}
+.ch.pop{animation:chPop 320ms var(--calm)}
+.ch.paste{animation:fade 260ms var(--calm)}
+@keyframes chPop{40%{background:rgba(34,37,31,.16)}}
+.caret{position:relative;display:inline-block;width:0;height:1em;vertical-align:-.14em}
+.caret[hidden]{display:none}
+.caret::before{content:"";position:absolute;left:0;top:50%;width:1.5px;height:1.15em;transform:translateY(-50%);background:var(--acc);animation:caretBlink 1.1s steps(1) infinite}
+@keyframes caretBlink{50%{opacity:0}}
+.cmp{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:1.04em;height:1.2em;padding:0 5px;vertical-align:-.2em;border-radius:6px;box-shadow:inset 0 0 0 1px var(--soft);background:linear-gradient(to top,rgba(47,107,95,.15) calc(var(--g,0)*100%),transparent 0)}
+.zy{font:400 12.5px/1 var(--f-ui);color:var(--soft);white-space:nowrap}
+.nav-in:empty{display:none}
+#keyForm textarea{width:100%;border:0;border-radius:var(--r-sm);background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);padding:12px 16px;outline:0;resize:vertical;font-family:var(--f-num);font-size:14px}
+#keyForm textarea:focus{box-shadow:inset 0 0 0 1.5px var(--ink)}
+#keyForm .off{color:var(--soft)}
+.cap-foot{display:flex;align-items:center;justify-content:flex-end;gap:10px}
+.cap-foot .off{margin-right:auto;font-size:13px;color:var(--warn)}
+.cap-band{margin-bottom:14px}
+
+/* ---------- 一筆紀錄＋展開的操作 ---------- */
+.item{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:baseline;padding:12px 10px;border-radius:var(--r-sm);text-align:left;cursor:pointer;transition:background-color 180ms var(--calm)}
+.item:hover,.item.open{background:var(--mark)}
+.item p{margin:0;font-size:15.5px;line-height:1.6;min-width:0}
+.item.new{animation:rise 520ms var(--calm) both}
+.menu{grid-column:1 / -1;display:none;flex-wrap:wrap;gap:6px;padding-top:6px}
+[data-menu].open>.menu,[data-menu].open .menu{display:flex;animation:fade 200ms var(--calm)}
+.menu button{min-height:34px;padding:0 13px;border-radius:999px;font-size:13.5px;background:var(--surf);box-shadow:inset 0 0 0 1px var(--line);white-space:nowrap}
+.menu button:hover{box-shadow:inset 0 0 0 1px var(--ink)}
+.menu button.del{color:var(--warn)}
+.menu button.del.arm{background:var(--warn);color:var(--surf);box-shadow:none}
+
+/* ---------- 案件列（questHTML）：客戶｜分段進度條｜幾天沒動 ---------- */
+.quests,.panels{display:flex;flex-direction:column;gap:8px}
+.quest{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr) 64px;gap:16px;align-items:center;width:100%;padding:15px 18px;border-radius:var(--r-sm);background:color-mix(in srgb,var(--bg) 82%,transparent);box-shadow:inset 0 0 0 1px var(--line);text-align:left;transition:background-color 180ms var(--calm),transform 180ms var(--calm)}
+.quest:hover{background:var(--surf)}
+.quest:active{transform:scale(.99)}
+.quest.pop,.quest.just{animation:rise 520ms var(--calm) both}
+.q-name{display:flex;flex-direction:column;gap:2px;min-width:0}
+.q-name strong{font:400 18px/1.3 var(--f-voice)}
+.q-name span{font-size:13px;color:var(--soft)}
+.q-meta{display:flex;flex-direction:column;gap:7px;min-width:0}
+.q-lab{display:flex;align-items:center;gap:8px;font-size:14px;min-width:0}
+.q-lab b{font-weight:500;white-space:nowrap}
+.q-lab i{font:300 12px var(--f-num);font-style:normal;color:var(--mute)}
+.who{font-size:12px;padding:0 9px;border-radius:999px;white-space:nowrap;line-height:20px}
+.who.me{background:var(--ink);color:var(--bg)}
+.who.them{box-shadow:inset 0 0 0 1px var(--line);color:var(--soft)}
+.who.done{color:var(--mute)}
+.q-note{font-size:13px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.q-age{text-align:right;font:300 24px/1 var(--f-num)}
+.q-age span{display:block;margin-top:4px;font:400 11px var(--f-ui);color:var(--soft)}
+.q-age.hot{color:var(--warn)}
+.quest.fin{opacity:.6;background:transparent}
+.quest.lock .q-lab b{color:var(--warn)}
+.stepper{display:grid;grid-template-columns:repeat(var(--n),1fr);gap:4px}
+.stepper .seg{height:6px;border-radius:6px;background:rgba(34,37,31,.1);transition:background-color 420ms var(--calm)}
+.stepper .seg.past{background:rgba(34,37,31,.45)}
+.stepper .seg.cur{background:var(--ink)}
+.stepper .seg.adv{animation:segIn 800ms var(--calm)}
+@keyframes segIn{from{transform:scaleX(.2);transform-origin:left}}
+.quest.lock .seg.cur{background:var(--warn)}
+.quest.fin .seg{background:rgba(34,37,31,.3)}
+@media (max-width:620px){.quest{grid-template-columns:minmax(0,1fr) 54px;gap:10px 12px}.q-meta{grid-column:1 / -1;grid-row:2}}
+.add-case{display:flex;justify-content:flex-end}
+.tray{padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.tray-h{font-size:13px;color:var(--soft);letter-spacing:.1em}
+
+/* ---------- 首頁（手機）：日期列 → 記一筆 → 四個分頁 ---------- */
+.mh{display:flex;align-items:center;gap:10px;margin:4px 0 14px}
+.mh-date b{font:300 30px/1 var(--f-num)}
+.mh-date small{margin-left:8px;font:400 16px var(--f-voice);color:var(--soft)}
+.mh-acts{margin-left:auto;display:flex;gap:6px}
+.m-cap .typebox textarea{min-height:84px}
+.mtabs{position:sticky;top:calc(10px + env(safe-area-inset-top,0px));z-index:5;display:flex;gap:2px;margin:14px 0;padding:5px;border-radius:999px;background:color-mix(in srgb,var(--surf) 84%,transparent);box-shadow:inset 0 0 0 1px var(--line);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.mtabs button{position:relative;flex:1;min-height:44px;border-radius:999px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:15px;color:var(--soft)}
+.mtabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.mtabs b{font:300 13px var(--f-num)}
+.m-dot{position:absolute;top:8px;right:12px;width:6px;height:6px;border-radius:50%;background:var(--warn)}
+.mt-body{display:flex;flex-direction:column;gap:12px;animation:fade 260ms var(--calm)}
+.m-empty,.dk-empty,.rc-empty,.cd-none,.sb-more,.cal-none,.wk-none{margin:0;padding:6px 4px;font:400 16px/1.8 var(--f-voice);color:var(--soft)}
+.m-sec{padding:16px;display:flex;flex-direction:column;gap:10px}
+.m-h,.rc-h,.cr-h,.cd-h3{display:flex;align-items:baseline;gap:10px;margin:0;font:400 13px var(--f-ui);color:var(--soft);letter-spacing:.1em}
+.m-h span,.rc-h span,.cr-h span,.cd-h3 span{margin-left:auto;letter-spacing:0}
+
+/* 日誌：時間一欄＋內容（手機 strip、電腦 tc） */
+.strip,.tc{padding:16px 14px;display:flex;flex-direction:column}
+.p-head,.tc-h{display:flex;align-items:baseline;gap:10px;padding:0 6px 8px;font-size:13px;color:var(--soft);letter-spacing:.1em}
+.p-clock,.tc-clock{margin-left:auto;font:300 20px var(--f-num);color:var(--ink);letter-spacing:0}
+.p-clock small,.tc-clock small{font-size:12px;color:var(--mute)}
+.p-scroll,.tc-rows{display:flex;flex-direction:column}
+.p-half,.tc-half{padding:10px 8px 2px;font-size:12px;color:var(--mute);letter-spacing:.2em}
+.item.punch{grid-template-columns:3.4em minmax(0,1fr)}
+.p-t{font:300 13px/1.9 var(--f-num);color:var(--soft)}
+.p-ago{display:block;font-size:12px;color:var(--mute)}
+.p-now{display:grid;grid-template-columns:3.4em minmax(0,1fr);gap:12px;align-items:center;padding:10px 10px 2px;font-size:12px;color:var(--mute)}
+.p-now b{font:300 13px var(--f-num);color:var(--ink)}
+.p-now i{display:none}
+.p-now span{border-top:1px dashed var(--line);padding-top:6px}
+.p-sum{padding:8px 8px 0;font-size:13px;color:var(--soft)}
+.p-sum b{font:300 15px var(--f-num);margin:0 4px;color:var(--ink)}
+.tc-t{color:var(--ink);font-size:15px;letter-spacing:.1em}
+
+/* 諮詢：沒回的一張卡（等了多久），回過的一行一通 */
+.ph{padding:16px;display:flex;flex-direction:column;gap:10px}
+.ph-bar{display:flex;align-items:center;gap:8px;font-size:15px;letter-spacing:.1em}
+.ph-bar .dot{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.ph-bar .dot.on{background:var(--warn);animation:breathe 4.6s ease-in-out infinite}
+@keyframes breathe{50%{opacity:.35}}
+.ph-n{font-size:13px;color:var(--soft);letter-spacing:0}
+.ph-bar em{margin-left:auto;font-style:normal;font-size:13px;color:var(--warn)}
+.item.call,.item.ph-card{display:flex;gap:12px;padding:14px 16px;border-radius:var(--r-sm);background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);flex-direction:column}
+.item.ph-card{flex-direction:row}
+.ph-icon{display:none}
+.ph-main,.c-in{display:flex;flex-direction:column;gap:6px;min-width:0;flex:1}
+.ph-who,.c-who{font:400 17px var(--f-voice)}
+.ph-who small{margin-left:8px;font:300 12px var(--f-num);color:var(--soft)}
+.ph-q,.c-q{margin:0;font-size:15px;color:var(--ink)}
+.ph-f,.c-f{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.ph-wait,.c-wait{margin-right:auto;font-size:12px;color:var(--soft)}
+.ph-wait b,.c-wait b{margin-left:6px;font:300 13px var(--f-num);color:var(--ink)}
+.c-bar{display:flex;justify-content:space-between;font-size:12px;color:var(--soft)}
+.c-bar b{display:inline-flex;align-items:center;gap:6px;font-weight:500;letter-spacing:.1em}
+.c-led{width:6px;height:6px;border-radius:50%;background:var(--ink)}
+.c-acts{display:flex;gap:6px}
+.ph-btn,.c-reply,.ask-go{min-height:34px;padding:0 14px;border-radius:999px;font-size:14px;background:var(--acc);color:var(--on-acc)}
+.ph-btn.ghost,.ask-go{background:var(--surf);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.ph-log,.c-log{display:flex;flex-direction:column}
+.c-log{padding:12px}
+.c-log-h{display:flex;justify-content:space-between;padding:0 8px 6px;font-size:13px;color:var(--soft)}
+.item.callrow{grid-template-columns:3.4em 4.5em minmax(0,1fr);gap:4px 10px}
+.r-t{font:300 13px var(--f-num);color:var(--soft)}
+.r-w{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.r-x{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--soft)}
+.r-a{grid-column:3;display:none;font-size:14px;color:var(--good)}
+.callrow.open .r-x{white-space:normal}
+.callrow.open .r-a{display:block}
+
+/* 追蹤：待確認、行程 */
+.pend{padding:14px 16px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.pend .q{font-size:15px}
+.pend q{font-family:var(--f-voice)}
+.acts{display:flex;flex-wrap:wrap;gap:6px}
+.done-line{display:flex;align-items:center;gap:8px;padding:8px 4px;font-size:14px;color:var(--soft)}
+.day{padding:10px 4px 2px;font-size:12px;color:var(--mute);letter-spacing:.1em}
+.sch{display:grid;grid-template-columns:3.6em minmax(0,1fr);gap:10px;padding:6px 4px}
+.sch-d small{display:block;font-size:12px;color:var(--soft)}
+
+/* ---------- 行程月曆 ---------- */
+.cal{padding:16px;display:flex;flex-direction:column;gap:6px;background:transparent;box-shadow:none}
+.rc .cal,.m-sec .cal{padding:0}
+.cal-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cal-title{display:flex;align-items:baseline;gap:10px}
+.cal-title b{font:300 30px/1 var(--f-voice)}
+.cal-title b small{font-size:16px;margin-left:2px}
+.cal-wa{font:400 14px var(--f-voice);color:var(--soft)}
+.cal-wa small{margin-left:6px;font:300 12px var(--f-num)}
+.cal-season{display:none}
+.cal-nav{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;box-shadow:inset 0 0 0 1px var(--line);font-size:18px}
+.cal-nav:hover{background:var(--mark)}
+.cal-w,.cal-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.cal-w span{text-align:center;font-size:12px;color:var(--soft);padding:4px 0}
+.cal-w span:first-child,.cal-w span:last-child{color:var(--mute)}
+.cal-d{position:relative;min-height:52px;display:flex;flex-direction:column;align-items:center;gap:1px;padding-top:5px;border-radius:var(--r-sm);min-width:0}
+.cal-d:hover{background:var(--mark)}
+.cal-d b{width:28px;height:28px;display:grid;place-items:center;border-radius:50%;font:300 14px var(--f-num)}
+.cal-d small{font-size:10px;color:var(--warn);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.cal-d.we b{color:var(--mute)}
+.cal-d.holi b{color:var(--warn)}
+.cal-d.past{opacity:.55}
+.cal-d.today b{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.cal-d.sel b{background:var(--ink);color:var(--bg)}
+.cal-d.run::before{content:"";position:absolute;left:0;right:0;bottom:3px;height:3px;background:rgba(164,72,46,.3)}
+.cal-d.run-s::before{left:20%;border-radius:3px 0 0 3px}.cal-d.run-e::before{right:20%;border-radius:0 3px 3px 0}
+.cal-dot{display:grid;place-items:center;min-width:5px;height:5px;border-radius:50%;background:var(--ink);font:400 9px var(--f-num);font-style:normal;color:var(--bg)}
+.cal-dot:not(:empty){min-width:14px;height:14px;border-radius:7px;padding:0 3px}
+.cal-x{visibility:hidden}
+.cal-list{display:flex;flex-direction:column;gap:6px;margin-top:6px;padding-top:10px;border-top:1px solid var(--line)}
+.cal-lh{display:flex;align-items:baseline;gap:10px}
+.cal-lh b{font:300 20px var(--f-num)}
+.cal-lh span{font-size:13px;color:var(--soft)}
+.cal-back{margin-left:auto;font-size:13px;color:var(--acc);min-height:32px}
+.cal-notes{display:flex;flex-wrap:wrap;gap:6px}
+.cal-notes span{font-size:12px;padding:0 9px;border-radius:999px;box-shadow:inset 0 0 0 1px var(--line);color:var(--soft)}
+.cal-ev{display:grid;grid-template-columns:3.4em minmax(0,1fr);gap:10px;align-items:baseline;padding:6px 4px}
+.cal-t{font:300 13px var(--f-num);color:var(--soft)}
+.cal-dsc small{display:block;font-size:12px;color:var(--soft)}
+
+/* ---------- 抽屜：手機從下面浮上來、電腦在中間 ---------- */
+.scrim{position:fixed;inset:0;z-index:30;display:flex;align-items:flex-end;justify-content:center;background:rgba(34,37,31,.18);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:fade 240ms var(--calm)}
+.sheet{width:100%;max-width:640px;max-height:min(88vh,860px);overflow:auto;background:var(--surf);border-radius:var(--r-lg) var(--r-lg) 0 0;padding:24px 22px calc(22px + env(safe-area-inset-bottom,0px));box-shadow:0 -1px 0 var(--line),var(--lift);animation:rise 420ms var(--calm) both}
+.sheet-plate{margin:0 0 6px;font:400 22px/1.35 var(--f-voice)}
+.sheet-in{display:flex;flex-direction:column;gap:10px}
+.sheet p{margin:0;line-height:1.7}
+.sheet h4{margin:10px 0 0;font:400 13px var(--f-ui);color:var(--soft);letter-spacing:.1em}
+.sheet h4 span{margin-left:8px;letter-spacing:0}
+.sheet label{font-size:13px;color:var(--soft);letter-spacing:.06em;margin-top:4px}
+.sheet input,.sheet textarea{width:100%;min-height:46px;border:0;border-radius:var(--r-sm);background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);padding:10px 16px;outline:0;line-height:1.6;transition:box-shadow 180ms}
+.sheet input:focus,.sheet textarea:focus{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.sheet textarea{resize:vertical}
+.sheet-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.sheet-head p b{margin:0 8px;font-weight:500}
+.sheet-head p span{font-size:13px;color:var(--soft)}
+.sheet-tools{display:flex;gap:6px}
+.sheet-foot{position:sticky;bottom:-22px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px -22px -22px;padding:14px 22px calc(18px + env(safe-area-inset-bottom,0px));background:var(--surf);border-top:1px solid var(--line)}
+.sheet-foot .danger{margin-left:auto}
+.stages{display:flex;flex-direction:column;gap:6px}
+.stage{display:grid;grid-template-columns:2.4em minmax(0,1fr) auto;align-items:center;gap:8px;min-height:46px;padding:0 16px;border-radius:var(--r-sm);background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);text-align:left}
+.stage .no{font:300 12px var(--f-num);color:var(--mute)}
+.stage b{font-weight:500}
+.stage small{font-size:12px;color:var(--soft)}
+.stage small em{font-style:normal;margin-right:6px;color:var(--ink)}
+.stage[aria-pressed="true"]{background:var(--ink);color:var(--bg);box-shadow:none}
+.stage[aria-pressed="true"] .no,.stage[aria-pressed="true"] small,.stage[aria-pressed="true"] small em{color:var(--bg)}
+.stage.cur{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.pick{display:flex;flex-wrap:wrap;gap:6px}
+.pick button{min-height:38px;padding:0 15px;border-radius:999px;font-size:14px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line)}
+.pick button[aria-pressed="true"]{background:var(--ink);color:var(--bg);box-shadow:none}
+.pick .add-opt{color:var(--acc)}
+.sug-new{align-self:center;font-size:13px;color:var(--soft)}
+.opt-new,.addstep .row{display:flex;gap:8px;align-items:center}
+.addstep summary{cursor:pointer;font-size:14px;color:var(--acc);padding:6px 0}
+.plog{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.plog li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:baseline;padding:10px;border-radius:var(--r-sm);cursor:pointer}
+.plog li:hover,.plog li.open{background:var(--mark)}
+.brief-sum{display:flex;gap:16px;flex-wrap:wrap}
+.brief-sum span{display:flex;flex-direction:column;font-size:13px;color:var(--soft)}
+.brief-sum b{font:300 30px var(--f-num);color:var(--ink)}
+.brief-sum .hot b{color:var(--warn)}
+.brief-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;width:100%;min-height:52px;padding:8px 12px;border-radius:var(--r-sm);text-align:left}
+.brief-row:hover{background:var(--mark)}
+.b-who small{margin-left:4px;font-size:13px;color:var(--soft)}
+.b-step{font-size:14px}
+.b-age{font:300 14px var(--f-num);color:var(--soft)}
+.brief-row.hot .b-age{color:var(--warn)}
+.brief-sch{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;padding:6px 12px}
+/* 電腦版開場：中間一塊，從霧裡浮上來 */
+.stage-brief{position:fixed;inset:0;z-index:30;display:grid;place-items:center;padding:24px;background:rgba(244,241,234,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:fade 400ms var(--calm)}
+.sb-panel{width:min(760px,100%);max-height:88vh;overflow:auto;background:var(--surf);border-radius:var(--r-lg);padding:32px 34px;box-shadow:inset 0 0 0 1px var(--line),var(--lift);display:flex;flex-direction:column;gap:14px;animation:rise 640ms var(--calm) both}
+.sb-top{display:flex;align-items:baseline;gap:18px}
+.sb-top b{font:300 44px/1.1 var(--f-voice)}
+.sb-top span{font:400 18px/1.6 var(--f-voice);color:var(--soft)}
+.sb-list{display:flex;flex-direction:column;gap:8px}
+.sb-sch{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px}
+.sb-go{display:flex;justify-content:flex-end;padding-top:6px}
+
+/* ---------- 其他頁 ---------- */
+.filters{padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.frow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.frow>span{min-width:3em;font-size:13px;color:var(--soft)}
+.frow button,.tabs button{min-height:34px;padding:0 13px;border-radius:999px;font-size:14px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line)}
+.frow button[aria-pressed="true"],.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg);box-shadow:none}
+.tabs{display:flex;gap:6px}
+.sec-h .ttl{margin:0}
+.cases-band .wrap{gap:10px}
+.tl-day{margin:18px 0 6px;font-size:13px;color:var(--soft);letter-spacing:.1em}
+.rec{display:flex;flex-direction:column;gap:6px;padding:14px 16px;margin-bottom:8px;border-radius:var(--r-sm);background:var(--tile);box-shadow:inset 0 0 0 1px var(--line);cursor:pointer}
+.rec.open{box-shadow:inset 0 0 0 1px var(--ink)}
+.rec-h{display:flex;align-items:center;gap:10px}
+.rec-state{font-size:12px;color:var(--soft)}
+.rec-raw{margin:0;font:400 16px/1.8 var(--f-voice)}
+.rec-seg{display:flex;gap:8px;align-items:baseline;font-size:14px;color:var(--soft)}
+.back{align-self:flex-start;min-height:40px;padding:0 18px;border-radius:999px;background:var(--tile);box-shadow:inset 0 0 0 1px var(--line);font-size:14px}
+/* 客戶 */
+.cl-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.cl-count{font-size:13px;color:var(--soft)}
+.cl-count b{font:300 20px var(--f-num);color:var(--ink);margin-right:4px}
+.cl-tools{display:flex;gap:8px;align-items:center;padding:8px;border-radius:999px}
+.search{flex:1}
+.search input{width:100%;min-height:44px;border:0;background:transparent;padding:0 14px;outline:0}
+.cr-list{display:flex;flex-direction:column;gap:16px}
+.cr-g{display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:var(--r-lg);background:var(--tile);box-shadow:inset 0 0 0 1px var(--line)}
+.cr-h{padding:0 6px 4px}
+button.cr{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"n d" "s s" "l l";gap:2px 10px;width:100%;padding:12px 10px;border-radius:var(--r-sm);text-align:left}
+button.cr:hover{background:var(--mark)}
+.cr-name{grid-area:n;display:flex;align-items:baseline;gap:6px;min-width:0}
+.cr-name b{font:400 17px var(--f-voice)}
+.cr-name i,.cc-alias i{font-style:normal;font-size:12px;padding:0 7px;border-radius:6px;background:var(--mark)}
+.cr-st{grid-area:s;display:flex;gap:6px;flex-wrap:wrap}
+.cr-st em{font-style:normal;font-size:12px;color:var(--soft)}
+.cr-st em.on{color:var(--ink);font-weight:500}
+.cr-st em.lk{color:var(--warn)}
+.cr-last{grid-area:l;font-size:14px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr-date{grid-area:d;font:300 13px var(--f-num);color:var(--soft)}
+.cd-grid{display:grid;gap:14px}
+.cd-card{padding:22px;display:flex;flex-direction:column;gap:10px}
+.cd-nm{margin:0;font:300 34px/1.2 var(--f-voice)}
+.cd-full{margin:0;color:var(--soft)}
+.cc-alias{margin:0;display:flex;gap:6px}
+.cd-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 0;border-block:1px solid var(--line)}
+.cd-stats span{display:flex;flex-direction:column;align-items:center;font-size:12px;color:var(--soft)}
+.cd-stats b{font:300 22px var(--f-num);color:var(--ink)}
+.cd-info{margin:0;display:flex;flex-direction:column;gap:6px}
+.cd-f{display:grid;grid-template-columns:3.5em minmax(0,1fr);gap:10px;align-items:center}
+.cd-f dt{font-size:13px;color:var(--soft)}
+.cd-f dd{margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cd-empty{color:var(--mute)}
+.cd-acts{display:flex;gap:8px;flex-wrap:wrap}
+.cd-main{display:flex;flex-direction:column;gap:14px}
+.cd-sec{padding:18px;display:flex;flex-direction:column;gap:10px}
+.cd-tl{display:flex;flex-direction:column}
+.cd-day{padding:10px 4px 4px;font-size:12px;color:var(--mute);letter-spacing:.1em}
+.cd-h{display:grid;grid-template-columns:3.4em auto minmax(0,1fr);gap:10px;align-items:baseline;padding:6px 4px}
+.cd-h p{margin:0;font-size:15px}
+.cd-t{font:300 13px var(--f-num);color:var(--soft)}
+/* 週報 */
+.wk-tabs{display:flex}
+.wk-paper{padding:26px 24px;display:flex;flex-direction:column;gap:18px}
+.wk-mast{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.wk-brand{font:300 34px/1 var(--f-voice);letter-spacing:.1em}
+.wk-issue{font-size:14px;color:var(--soft)}
+.wk-issue b{font:300 22px var(--f-num);color:var(--ink);margin:0 4px}
+.wk-tag{margin-left:auto;font-size:13px;color:var(--soft)}
+.wk-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.wk-stats div{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:var(--r-sm);background:var(--bg);box-shadow:inset 0 0 0 1px var(--line)}
+.wk-stats b{font:300 30px/1.1 var(--f-num)}
+.wk-stats span{font-size:13px;color:var(--soft)}
+.wk-stats small{margin-left:2px}
+.wk-grid{display:grid;gap:18px}
+.wk-main,.wk-side{display:flex;flex-direction:column;gap:18px}
+.wk-sec{display:flex;flex-direction:column;gap:8px}
+.wk-h{margin:0;display:flex;align-items:baseline;gap:10px;font:400 18px var(--f-voice)}
+.wk-no{font:300 12px var(--f-num);color:var(--mute)}
+.wk-h small{display:none}
+.wk-list,.wk-plain,.wk-next{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.wk-biz{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.wk-biz b{font:400 17px var(--f-voice)}
+.wk-kind{font-size:13px;color:var(--soft)}
+.wk-st{font-size:14px}
+.wk-q{display:flex;flex-direction:column;gap:2px}
+.wk-q q{font-family:var(--f-voice);color:var(--soft)}
+.wk-next li{display:flex;gap:10px;align-items:baseline}
+.wk-next i{width:12px;height:12px;border-radius:4px;box-shadow:inset 0 0 0 1.5px var(--ink);flex:none;transform:translateY(1px)}
+.wk-plain li{font-size:15px}
+
+/* ---------- 待辦：今日頁最上面的勾選清單。做完的淡掉（不畫刪除線），期限是小膠囊，過期變紅 ---------- */
+.td{display:flex;flex-direction:column;gap:4px;padding:14px 16px;margin:0 0 14px;background:var(--tile);border-radius:var(--r-lg);box-shadow:inset 0 0 0 1px var(--line)}
+.td-h{display:flex;align-items:baseline;gap:10px;margin:0 0 2px;font:400 13px var(--f-ui);color:var(--soft);letter-spacing:.1em}
+.td-h span{margin-left:auto;letter-spacing:0}
+.td-list{display:flex;flex-direction:column}
+.td-row{display:flex;align-items:center;gap:10px;min-height:44px;transition:opacity 260ms var(--calm)}
+.td-chk{flex:none;width:24px;height:24px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--ink);display:grid;place-items:center;transition:background-color 180ms var(--calm)}
+.td-chk svg{width:14px;height:14px;fill:none;stroke:var(--bg);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.td-chk[aria-pressed="true"]{background:var(--ink)}
+.td-chk[aria-pressed="true"] svg{opacity:1}
+.td-x{flex:1;min-width:0;padding:8px 0;font-size:15px;line-height:1.5;text-align:left;overflow-wrap:anywhere}
+.td-due{flex:none;padding:0 9px;border-radius:999px;font:300 12px/22px var(--f-num);color:var(--soft);box-shadow:inset 0 0 0 1px var(--line)}
+.td-due.now{color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.td-due.late{color:var(--warn);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--warn) 45%,transparent)}
+.td-row.done{opacity:.5}
+.td .c-more{align-self:flex-start}
+.td-add{display:flex;gap:6px;align-items:center;margin-top:4px}
+.td-add input{min-width:0;min-height:40px;border:0;border-radius:999px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);padding:0 14px;outline:0}
+.td-add input:focus{box-shadow:inset 0 0 0 1.5px var(--ink)}
+#todoIn{flex:1}
+#todoDue{flex:none;width:9.6em;padding:0 10px;font:300 13px var(--f-num);color:var(--soft)}
+@media (max-width:620px){.td-add{flex-wrap:wrap}#todoIn{flex-basis:100%}#todoDue{flex:1}}
+
+/* ---------- 專案：列表沿用案件列；文件關卡在進度條上多一個紅點 ---------- */
+.pj-track .seg{position:relative}
+.pj-track .seg.doc::after{content:"";position:absolute;left:50%;top:-6px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--warn)}
+.pj-row .q-meta{padding-top:4px}
+.pj-done-h{padding:6px 6px 0}
+.pj-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.pj-title{min-width:0}
+.pj-nm{margin:0;font:400 clamp(26px,4vw,34px)/1.2 var(--f-voice);letter-spacing:.02em}
+.pj-sub{margin:6px 0 0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;font-size:14px;color:var(--soft)}
+.pj-cl{color:var(--acc);font-size:15px}
+.pj-acts{display:flex;flex-wrap:wrap;gap:8px}
+.pj-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.pj-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+/* 流程：照使用者的流程圖。左欄是誰負責，右邊是關卡；文件關卡紅框；走過的淡掉、目前那關黑框＋「目前」；最後一關是深色結案 */
+.pj-flow{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.pf{display:grid;grid-template-columns:5.4em minmax(0,1fr);gap:10px}
+.pf-who{align-self:center;padding-bottom:14px;font-size:12px;color:var(--soft);text-align:right;letter-spacing:.04em}
+.pf-box{position:relative;width:100%;margin:0 0 14px;padding:10px 14px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;border-radius:var(--r-sm);background:var(--surf);box-shadow:inset 0 0 0 1px var(--line);text-align:left}
+.pf:not(:last-child) .pf-box::after{content:"";position:absolute;left:50%;bottom:-14px;width:1px;height:14px;background:var(--line)}
+.pf-box b{font-size:15px;font-weight:500}
+.pf-box small{font-size:12px;color:var(--soft)}
+.pf-box em{margin-bottom:2px;padding:0 9px;border-radius:999px;background:var(--ink);color:var(--bg);font:500 12px/20px var(--f-ui);font-style:normal}
+button.pf-box:hover{background:var(--bg)}
+.pf.doc .pf-box{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--warn) 70%,transparent)}
+.pf.doc .pf-box small{color:var(--warn)}
+.pf.past .pf-box{opacity:.45}
+.pf.cur .pf-box{box-shadow:inset 0 0 0 2px var(--ink)}
+.pf.cur.doc .pf-box{box-shadow:inset 0 0 0 2px var(--warn)}
+.pf.end .pf-box{align-items:center;background:var(--ink);color:var(--bg);box-shadow:none;opacity:.3}
+.pf.end.cur .pf-box{opacity:1}
+/* 報價試算：品項表（窄螢幕橫向捲動）＋合計格；含稅總計是唯一深色格 */
+.qt-top{display:flex;flex-wrap:wrap;gap:10px}
+.qt-top label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--soft)}
+.qt-top input,.qt input{width:100%;min-width:0;min-height:38px;border:0;border-radius:10px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);padding:0 10px;outline:0}
+.qt-top input:focus,.qt input:focus{box-shadow:inset 0 0 0 1.5px var(--ink)}
+#qVendor{width:12em}
+#qMarkup{width:5em;font-family:var(--f-num)}
+.qt-scroll{position:relative;overflow-x:auto;margin:0 -4px}
+.qt{width:100%;min-width:420px;border-collapse:separate;border-spacing:4px;font-size:14px}
+.qt th{padding:0 4px;font:400 12px var(--f-ui);color:var(--soft);text-align:left;white-space:nowrap}
+.qt td.num{padding:0 4px;font:300 14px var(--f-num);text-align:right;white-space:nowrap}
+.qt td.num small{display:block;font-size:11px;color:var(--soft)}
+.qt [data-qf="q"],.qt [data-qf="c"]{font-family:var(--f-num);text-align:right}
+.qt td:nth-child(1){width:33%}.qt td:nth-child(2),.qt td:nth-child(3){width:9%}.qt td:nth-child(4){width:22%}
+.qt-del{width:30px;height:30px;border-radius:50%;color:var(--mute);font-size:18px;line-height:1}
+.qt-del:hover{color:var(--warn);background:var(--mark)}
+.qt-add{align-self:flex-start;padding:6px 4px;font-size:14px;color:var(--acc)}
+.qt-sum{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px}
+.qt-sum div{padding:10px 12px;border-radius:12px;background:var(--bg)}
+.qt-sum dt{font-size:12px;color:var(--soft)}
+.qt-sum dd{margin:2px 0 0;font:300 17px var(--f-num)}
+.qt-sum dd small{margin-left:6px;font-size:12px;color:var(--soft)}
+.qt-sum dd.neg{color:var(--warn)}
+.qt-sum .tot{background:var(--ink);color:var(--bg)}
+.qt-sum .tot dt{color:color-mix(in srgb,var(--bg) 72%,transparent)}
+.qt-foot{display:flex;flex-wrap:wrap;gap:8px}
+/* 文件：報價單、驗收單、開發票三列 */
+.doc-row{display:grid;grid-template-columns:4.2em minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0}
+.doc-row + .doc-row{border-top:1px solid var(--line)}
+.doc-row b{font-size:14px;font-weight:500}
+.doc-st{min-width:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font-size:13px;color:var(--soft)}
+.doc-st small{font:300 12px var(--f-num)}
+.doc-st .miss{color:var(--warn)}
+.doc-acts{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+@media (max-width:620px){.doc-row{grid-template-columns:4.2em minmax(0,1fr)}.doc-acts{grid-column:1 / -1;justify-content:flex-start}}
+/* 雲端工作站：收件匣卡片（右欄最上面、手機「追蹤」最上面）與整理過的檔案清單 */
+.st-card{display:flex;flex-direction:column;gap:10px;padding:14px 16px;background:var(--tile);border-radius:var(--r-lg);box-shadow:inset 0 0 0 1px var(--line)}
+.mt-body .st-card{margin-bottom:12px}
+.st-row{display:flex;align-items:center;gap:12px}
+.st-search{display:flex;gap:6px}
+.st-search input{flex:1;min-width:0;min-height:38px;border:0;border-radius:999px;background:var(--bg);box-shadow:inset 0 0 0 1px var(--line);padding:0 14px;outline:0}
+.st-search input:focus{box-shadow:inset 0 0 0 1.5px var(--ink)}
+.st-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.st-txt b{font:400 16px var(--f-voice)}
+.st-txt span{font-size:13px;color:var(--soft)}
+.st-txt em{font:300 15px var(--f-num);font-style:normal;color:var(--ink)}
+.st-card a.btn{text-decoration:none}
+.fls{display:flex;flex-direction:column}
+.fl{display:grid;grid-template-columns:44px auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 8px;border-radius:12px;color:var(--ink);text-decoration:none;
+  width:100%;border:0;background:none;font:inherit;text-align:left;cursor:pointer}
+.fl:hover{background:var(--mark)}
+/* 縮圖框：圖還沒回來時是一張淡淡的紙（右上角折一角），回來就填滿 */
+.fl-th,.rf-th{display:block;flex:none;border-radius:6px;overflow:hidden;background:var(--surf);box-shadow:inset 0 0 0 1px var(--line);
+  background-image:linear-gradient(225deg,var(--line) 0 7px,transparent 7px)}
+.fl-th{width:44px;height:44px}
+.rf-th{width:22px;height:22px;border-radius:4px;background-image:none}
+.fl-th img,.rf-th img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+/* 紀錄下面的相關檔案：小膠囊，點了預覽 */
+.rfs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 0}
+.item>.rfs{grid-column:2/-1}
+.quest .rfs{margin-top:6px}
+.rf,.tl-file{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border:1px solid var(--line);border-radius:999px;background:var(--surf);
+  font:inherit;font-size:12px;color:var(--soft);cursor:pointer;max-width:100%}
+.rf:hover,.tl-file:hover{color:var(--ink);border-color:var(--soft)}
+.rf-form{border-style:dashed}   /* 空白的申請書（要填的）用虛線，跟收到的檔案分開 */
+.tl-file{font-size:14px;color:var(--ink);text-align:left}
+.tl-file>span:last-child{min-width:0;overflow-wrap:anywhere}
+.tl-note{margin-left:8px;font-size:12px;color:var(--mute)}
+.tl-kinds{margin:0 0 4px}
+.cd-h.k-ev p{color:var(--soft)}
+/* 檔案預覽 */
+.fp{display:flex;flex-direction:column;gap:12px}
+.fp-img{display:flex;align-items:center;justify-content:center;min-height:160px;max-height:62vh;overflow:auto;border-radius:12px;background:var(--surf);box-shadow:inset 0 0 0 1px var(--line)}
+.fp-img img{display:block;width:100%;height:auto}
+.sheet-foot a.btn{text-decoration:none}
+/* 申請書挑選：業務分頁、一列一份（勾選框＋縮圖＋名稱，右邊「預覽」） */
+.fm-search{display:flex;flex-direction:column;gap:4px}
+.fm-search label{font-size:12px;color:var(--mute)}
+.fm-search input{width:100%}
+.fm-biz{margin:4px 0 2px;flex-wrap:wrap}
+.fm-list{display:flex;flex-direction:column}
+.fm-list h4{margin:14px 0 4px}
+.fm-row{display:flex;align-items:center;gap:6px;border-radius:12px}
+.fm-row.on{background:var(--mark)}
+.fm-pick{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:6px 8px;border:0;background:none;font:inherit;color:var(--ink);text-align:left;cursor:pointer;border-radius:12px}
+.fm-pick .fl-th{width:36px;height:36px}
+.fm-ck{flex:none;width:20px;height:20px;border-radius:6px;box-shadow:inset 0 0 0 1.5px var(--soft)}
+.fm-pick[aria-pressed="true"] .fm-ck{background:var(--acc);box-shadow:none}
+.fm-pick[aria-pressed="true"] .fm-ck::after{content:"";display:block;width:6px;height:11px;margin:2px 0 0 7px;border:solid var(--on-acc);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.fm-pick:not([data-fmpick]) .fm-ck{display:none}
+.fm-n{min-width:0;font-size:14px;overflow-wrap:anywhere}
+.fm-n small{display:block;font-size:12px;color:var(--mute)}
+.fm-eye{flex:none}
+.fm-sel{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:var(--soft)}
+.fm-sel .rf{padding:3px 10px}
+.fm-sel .rf b{font-weight:400;color:var(--mute)}
+.pf-forms{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 6px}
+.pf-forms h4{width:100%;margin:0;display:flex;gap:8px;align-items:baseline}
+.pf-forms h4 span{font-size:12px;font-weight:400;color:var(--mute)}
+.pf-forms .rfs{margin:0}
+.fp-msg{padding:24px;font-size:13px;color:var(--mute);text-align:center}
+.fp-meta .link{padding:0;border:0;background:none;font:inherit;color:var(--acc);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.fl-n{min-width:0;font-size:14px;overflow-wrap:anywhere}
+.fl-n small{display:block;font-size:12px;color:var(--soft)}
+.fl-d{font:300 12px var(--f-num);color:var(--soft)}
+/* 學到的規則 */
+.lr{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.lr li{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;gap:10px;align-items:center;padding:6px 8px 6px 12px;border-radius:12px;background:var(--bg)}
+.lr-k{font-family:var(--f-voice);overflow-wrap:anywhere}
+.lr-r{font-size:13px;color:var(--soft)}
+.lr small{font:300 12px var(--f-num);color:var(--mute)}
+.danger.sm{min-height:30px;padding:0 10px;font-size:12px}
+@media (max-width:420px){.nav-in button{padding:0 11px;font-size:14px}.lr li{grid-template-columns:minmax(0,1fr) auto}.lr-r{grid-column:1}}
+
+/* ---------- 電腦版（1100 以上）：左邊直式選單、中間內容、右邊固定欄 ---------- */
+@media (min-width:1100px){
+  main#view{max-width:none;margin:0 412px 0 252px;padding:40px 24px 80px}
+  .nav{left:28px;right:auto;top:28px;bottom:28px;width:200px;flex-direction:column;justify-content:flex-start}
+  .nav-in{flex-direction:column;align-items:stretch;gap:4px;padding:14px;border-radius:var(--r-lg)}
+  .nav-in button{text-align:left;padding:0 18px}
+  .side-brand{display:flex;align-items:baseline;justify-content:space-between;padding:6px 10px 14px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+  .side-brand b{font:400 20px var(--f-voice);letter-spacing:.1em}
+  .side-brand small{font:300 11px var(--f-num);color:var(--mute)}
+  #rail{display:block;position:fixed;top:28px;right:28px;bottom:28px;width:360px;overflow:auto;padding-right:4px}
+  #railBody{display:flex;flex-direction:column;gap:12px}
+  .rc{padding:16px;display:flex;flex-direction:column;gap:6px}
+  .rc-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:baseline;width:100%;padding:8px 8px;border-radius:var(--r-sm);text-align:left}
+  .rc-row:hover{background:var(--mark)}
+  .rc-row b{font:400 16px var(--f-voice);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rc-row span{font-size:13px;color:var(--soft)}
+  .rc-row span.lock{color:var(--warn)}
+  .rc-row em{font:300 13px var(--f-num);font-style:normal;color:var(--soft);min-width:3.4em;text-align:right}
+  .rc-row em.hot{color:var(--warn)}
+  .toast{left:calc(50% - 80px);bottom:32px}
+  .scrim{align-items:center}
+  .sheet{border-radius:var(--r-lg);max-height:86vh;box-shadow:inset 0 0 0 1px var(--line),var(--lift)}
+  .sheet-foot{padding-bottom:18px}
+  .dk{display:flex;flex-direction:column;gap:14px}
+  .dk-head{display:flex;align-items:baseline;gap:16px;margin-bottom:4px}
+  .dk-head .ttl{margin:0}
+  .dk-meta{margin-left:auto;display:flex;align-items:baseline;gap:10px;color:var(--soft)}
+  .dk-meta b{font:300 24px var(--f-num);color:var(--ink)}
+  .dk-cap .typebox textarea{min-height:66px}
+  .dk-board{display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:var(--r-lg);background:var(--tile);box-shadow:inset 0 0 0 1px var(--line)}
+  .dk-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+  .cd-grid{grid-template-columns:320px minmax(0,1fr);align-items:start}
+  .pj-grid{grid-template-columns:250px minmax(0,1fr);align-items:start}
+  .pj-flowsec{position:sticky;top:28px}
+  .rc-row span.me{color:var(--ink);font-weight:500}
+  .cd-card{position:sticky;top:28px}
+  .wk-grid{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+}
+@media (min-width:1100px) and (max-width:1320px){ main#view{margin-right:372px}#rail{width:320px} }
+/* ---------- 開啟畫面與品牌（巻物＋筆＋緋色印，跟記帳的扇子同一家族） ---------- */
+#splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;transition:opacity .4s var(--calm),visibility .4s}
+#splash.hide{opacity:0;visibility:hidden}
+#splash svg{width:min(56vw,220px);height:auto;overflow:visible}
+#splash .lg-mark,#splash .lg-word{opacity:0;transform-box:fill-box;transform-origin:50% 80%}
+#splash .lg-mark{transform:scale(.94);animation:splashIn .8s var(--calm) .05s forwards}
+#splash.word .lg-word{transform:translateY(10px);animation:splashIn .6s var(--calm) forwards}
+@keyframes splashIn{to{opacity:1;transform:none}}
+[stroke="#b8905f"]{stroke:var(--soft)}
+[stroke="#2b211a"]{stroke:var(--ink)}
+[fill="#2b211a"]{fill:var(--ink)}
+[fill="#6b5d4e"]{fill:var(--soft)}
+.side-brand svg{width:100%;height:auto;display:block}
+@media (prefers-reduced-motion:reduce){ *,*::before,*::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important} }
+</style>
+</head><body>
+
+
+<template id="logoTpl"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="日誌 NISSHI" viewBox="56 150 400 420"><g class="lg-mark"><path d="M136 214 H376 M136 334 H376" fill="none" stroke="#b8905f" stroke-width="5" stroke-linecap="round"/><path d="M340 232 V316 M314 232 V300 M288 232 V312 M262 232 V292 M236 232 V306 M210 232 V284" fill="none" stroke="#b8905f" stroke-width="4" stroke-linecap="round" opacity=".75"/><path d="M128 200 V348 M384 200 V348" fill="none" stroke="#2b211a" stroke-width="9" stroke-linecap="round"/><path d="M122 196 H134 M122 352 H134 M378 196 H390 M378 352 H390" fill="none" stroke="#2b211a" stroke-width="6" stroke-linecap="round"/><path d="M178 404 L338 262" fill="none" stroke="#2b211a" stroke-width="9" stroke-linecap="round"/><path d="M190 382 L204 396" fill="none" stroke="#2b211a" stroke-width="6" stroke-linecap="round"/><path d="M186 400 C168 402 150 414 140 436 C160 432 178 422 190 404 Z" fill="#2b211a"/><rect x="150" y="294" width="34" height="34" rx="3" fill="#b5452e"/></g><g class="lg-word"><text x="256" y="512" text-anchor="middle" fill="#2b211a" style="font:500 64px 'Noto Serif TC','PMingLiU',serif;letter-spacing:.18em">日誌</text><text x="256" y="552" text-anchor="middle" fill="#6b5d4e" style="font:500 20px 'Noto Serif TC',serif;letter-spacing:.5em">NISSHI</text></g></svg></template>
+<div id="splash" aria-hidden="true"></div>
+<script>
+/* 開啟畫面（跟記帳 App 的扇子同一家族）：巻物與筆浮現，等宋體字型到了（最多 1.2 秒）再浮出「日誌」，從打開起約 1.6 秒後淡出。
+   App 從背景切回來不會重新載入，所以不會重播。 */
+(() => {
+  const s = document.getElementById('splash');
+  s.append(document.getElementById('logoTpl').content.cloneNode(true));
+  const word = () => s.classList.add('word');
+  Promise.race([document.fonts ? document.fonts.load("500 64px 'Noto Serif TC'", '日誌') : Promise.resolve(), new Promise(r => setTimeout(r, 1200))]).then(word);
+  setTimeout(() => { s.classList.add('hide'); setTimeout(() => s.remove(), 420); }, Math.max(400, 1600 - performance.now()));
+})();
+</script>
+
+<main id="view"></main>
+<aside class="rail" id="rail" aria-label="要追的事">
+  <div id="railBody"></div>
+</aside>
+<nav class="nav" aria-label="主要頁面"><div class="nav-in" id="nav"></div></nav>
+<div id="overlay"></div>
+<div class="fx" id="fx" aria-hidden="true"></div>
+<span class="sync" id="sync" hidden>同步中</span>
+<canvas id="fog" aria-hidden="true"></canvas>
+<script>
+/* 背景的霧（助理風格）：幾團淡淡的霧慢慢飄，整片隨 4.6 秒的呼吸變濃變淡；點按、記下、換頁時撥開一圈（Fog.stir）。
+   霧本來就是糊的，所以畫布只用畫面的 1/4 解析度再放大，每秒最多畫 30 次；切到背景就停，減少動態時只畫一張不動的。 */
+window.Fog = (() => {
+  const cv = document.getElementById('fog'), ctx = cv.getContext('2d'), SCALE = .25;
+  const still = matchMedia('(prefers-reduced-motion: reduce)');
+  let imps = [], last = 0;
+  const fr = x => x - Math.floor(x);
+  const breath = t => .5 - .5 * Math.cos(2 * Math.PI * t / 4600);
+  // 霧的顏色跟著一天走（跟助理大廳同一組）：深夜沉、清晨冷藍、白天青灰綠、傍晚暖橘、晚上暗下來；米白底不變
+  const TINTS = [[0, [150, 160, 156], .34], [5, [168, 182, 190], .3], [7.5, [186, 200, 204], .26], [11, [196, 204, 190], .24], [15.5, [200, 204, 184], .24], [17.5, [218, 196, 168], .28], [19.5, [178, 176, 168], .32], [24, [150, 160, 156], .34]];
+  function tint() {
+    const n = new Date(), h = n.getHours() + n.getMinutes() / 60; let i = 0; while (i < TINTS.length - 2 && TINTS[i + 1][0] <= h) i++;
+    const [h0, c0, a0] = TINTS[i], [h1, c1, a1] = TINTS[i + 1], k = Math.min(1, Math.max(0, (h - h0) / (h1 - h0)));
+    return { rgb: c0.map((v, j) => Math.round(v + (c1[j] - v) * k)).join(','), a: a0 + (a1 - a0) * k };
+  }
+  function size(){ cv.width = Math.max(1, Math.round(innerWidth * SCALE)); cv.height = Math.max(1, Math.round(innerHeight * SCALE)); }
+  function blob(x, y, r, rgb, a){
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(.55, `rgba(${rgb},${a * .45})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  function paint(t){
+    const w = innerWidth, h = innerHeight, b = breath(t), tt = t / 1000, tn = tint();
+    ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0);
+    ctx.fillStyle = 'rgb(244,241,234)'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 7; i++) {
+      const x = w * fr(i * .31 + .1) + Math.sin(tt * .05 + i) * 80, y = h * fr(i * .57 + .15) + Math.cos(tt * .04 + i * 1.3) * 60;
+      blob(x, y, w * (.38 + .28 * fr(i * .77)) + 60, tn.rgb, tn.a + .12 * b);
+    }
+    imps = imps.filter(m => t - m.t < 2400);
+    // 撥霧的時間戳記可能比這一格晚一點點（負數開根號會變 NaN），夾在 0 以上
+    for (const m of imps) { const a = Math.max(0, (t - m.t) / 2400); blob(m.x, m.y, 40 + 170 * Math.sqrt(a) * m.s, '244,241,234', Math.pow(1 - a, 1.4)); }
+  }
+  function loop(t){ requestAnimationFrame(loop); if (document.hidden || t - last < 33) return; last = t; paint(t); }
+  size(); addEventListener('resize', () => { size(); paint(performance.now()); });
+  if (still.matches) paint(0); else requestAnimationFrame(loop);
+  // 點任何按鈕都會撥一下霧
+  addEventListener('pointerdown', e => { if (e.target.closest('button,a,[data-menu]')) Fog.stir(e.clientX, e.clientY, .7); }, { passive: true });
+  return { stir(x, y, s = 1){ if (!still.matches) imps.push({ x, y, s, t: performance.now() }); if (imps.length > 16) imps.shift(); } };
+})();
+</script>
+
+<script>
+/* 工作日誌前端。資料來自 getState()；每個動作先在畫面上立即反映，再送到伺服器，回來後用伺服器的資料重畫。 */
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const CATS = ['日誌','業務','諮詢','待辦'];
+const B = (label, cls='', attrs='') => `<button class="btn ${cls}" ${attrs}><span>${label}</span></button>`;
+const QUEUE_KEY = 'worklog-queue';
+const pad = n => String(n).padStart(2,'0');
+const stamp = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+const S = { view:'home', homeTab:'today', clientId:null, q:'', anim:true, flash:[], bump:[], adv:null, justClosed:null, nc:{a:null,p:null},
+  f:{status:'全部',action:'全部',product:'全部'}, busy:0, ready:false, later:{}, realId:{}, pstep:'', confirmQ:[], ncItem:null, sheetCase:null, back:null };
+const STATE_KEY = 'worklog-state', TOKEN_KEY = 'worklog-key';
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set(k, v){ try { localStorage.setItem(k, v); } catch (e) {} },
+  del(k){ try { localStorage.removeItem(k); } catch (e) {} },
+};
+function load(state){
+  // 這次送出時寫到日期、伺服器已經排進日曆的行程：顯示一下（不存進快取，免得下次打開又跳一次）
+  const sch = state.scheduled || []; delete state.scheduled;
+  if (sch.length) toast('已排進日曆：' + sch.map(x => `${x.start.slice(5).replace('-', '/')}${x.end ? '–' + x.end.slice(5).replace('-', '/') : ''} ${x.desc}`).join('、'));
+  const prevWaiting = S.station && S.station.waiting;
+  Object.assign(S, state, state.settings); S.ready = true;
+  // 「今天」取伺服器時間與手機時間比較晚的那個：打開 App 先顯示上次存的畫面時，日期不會停在上次那天
+  const localDay = stamp(new Date()).slice(0, 10); S.today = state.now.slice(0, 10) > localDay ? state.now.slice(0, 10) : localDay;
+  // 伺服器沒有快取的收件匣數量時，沿用剛剛背景問到的
+  if (S.station && S.station.waiting == null && prevWaiting != null) S.station.waiting = prevWaiting;
+  // 新案件建立前就勾好的申請書：伺服器回來、有真的 id 了，找到那件補送（同客戶、同動作與產品、最新的那件）
+  const pf = S.pendingForms;
+  if (pf && !S.cases.some(k => String(k.id).startsWith('tmp') && k.client === pf.client)) {
+    const hit = S.cases.filter(k => k.client === pf.client && k.action === pf.action && k.product === pf.product).sort((a, b) => String(b.created).localeCompare(String(a.created)))[0];
+    S.pendingForms = null;
+    if (hit) { hit.forms = pf.ids; server('setCaseForms', hit.id, pf.ids); }
+  }
+  store.set(STATE_KEY, JSON.stringify(state));   // 下次打開先用這份秒開，再向伺服器更新
+}
+
+/* 伺服器呼叫：GitHub Pages 上用 fetch 帶金鑰呼叫 Apps Script。text/plain 不會觸發 CORS 預檢。 */
+const BUSY_RE = /lock|鎖|逾時|timed out|too many|頻繁|Service invoked|稍後再試/i;
+const LOST = '伺服器沒有正常回應';
+const READ_FNS = new Set(['getState', 'stationCount', 'fileThumbs', 'searchFiles', 'inboxList', 'company_byName', 'company_byId']);
+function call(fn, ...args){
+  const k = store.get(TOKEN_KEY);
+  if (!k) return Promise.reject(new Error('AUTH:還沒設定金鑰'));
+  S.busy++; syncTag();
+  // 60 秒沒回應就放棄（不然後面排隊的操作全部卡住）；Google 偶爾回錯誤頁而不是 JSON，也當成「沒有正常回應」。
+  // 這兩種情況伺服器可能其實已經做完了，所以不自動重送（重送會重複寫入），由 server() 重新整理畫面讓你確認
+  // 只讀的呼叫：Google 偶爾在「拿結果」那一步回「找不到網頁」，這時馬上重問（讀取重問不會重複寫入），最多 3 次。寫入的不重送
+  const read = READ_FNS.has(fn);
+  // （等待上限不能太短：慢的時候一次要 20～30 秒但會成功，太早放棄反而永遠拿不到）
+  const once = () => { const ctl = window.AbortController ? new AbortController() : null, timer = ctl && setTimeout(() => ctl.abort(), read ? 45000 : 60000);
+    return fetch(window.WORKLOG_API, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ k, fn, args }), signal: ctl ? ctl.signal : undefined })
+      .then(r => r.text()).then(t => { let o; try { o = JSON.parse(t); } catch (e) { throw new Error(LOST); } if (!o.ok) throw new Error(o.error); return o.data; })
+      .catch(e => { throw e && e.name === 'AbortError' ? new Error(LOST) : e; }).finally(() => clearTimeout(timer)); };
+  // 伺服器在忙（排程正在整理、等鎖逾時）：等一下自動再送，最多三次。這類錯誤發生在動作執行之前，重送不會重複寫入
+  const attempt = n => once().catch(e => { const m = String(e && e.message); if (n < 3 && (BUSY_RE.test(m) || (read && m === LOST))) return new Promise(r => setTimeout(r, 1500 * (n + 1))).then(() => attempt(n + 1)); throw e; });
+  return attempt(0).finally(() => { S.busy--; syncTag(); });
+}
+function syncTag(){ const el = document.getElementById('sync'); if (el) el.hidden = S.busy === 0; }
+function isAuth(e){ return String(e && e.message || e).startsWith('AUTH:'); }
+/* 伺服器操作一個接一個送（同時送的話，先送的可能晚回來，把畫面蓋回舊的）；全部回來才用伺服器的資料重畫 */
+let chain = Promise.resolve(), inflight = 0;
+function server(fn, ...args){
+  inflight++;
+  const p = chain.then(async () => {
+    try { load(await call(fn, ...args)); }
+    catch (e) {
+      if (isAuth(e)) { inflight = 0; keyScreen(e.message.slice(5)); return; }
+      toast(e && e.message === LOST ? '伺服器沒回應，已重新整理畫面，請確認剛剛的動作有沒有存到' : '沒存到：' + (e && e.message ? e.message : '請稍後再試'));
+      try { load(await call('getState')); } catch (_) {}
+    } finally { inflight = Math.max(0, inflight - 1); }
+    if (inflight === 0) render();
+  });
+  chain = p.catch(() => {});
+  return p;
+}
+/* 直接拿回應自己處理的呼叫（產生文件、轉專案、快記…）也排進同一條隊伍，晚送的回應不會被早送的蓋掉 */
+function queued(fn, ...args){
+  inflight++;
+  const p = chain.then(() => call(fn, ...args)).finally(() => { inflight = Math.max(0, inflight - 1); });
+  chain = p.catch(() => {});
+  return p;
+}
+/* 對某筆紀錄送出操作。剛記下、伺服器還沒回來的紀錄（tmp）先排隊，等 addRecord 回來換成真的 id 再補送。 */
+function serverItem(it, fn, ...rest){
+  const real = S.realId[it.id];
+  if (it.tmp && !real) { (S.later[it.tmp] = S.later[it.tmp] || []).push({ n: it.n, fn, rest }); return; }
+  server(fn, real || it.id, ...rest);
+}
+/* 剛記下的紀錄在伺服器回來後會換成新的物件，用這個找到畫面上現在那一份 */
+const live = it => S.items.find(i => i.id === it.id || i.id === S.realId[it.id]) || it;
+/* 找紀錄；更新進度這類剛建立、還沒有真 id 的，請使用者稍等 */
+function itemFor(id){
+  const it = S.items.find(i => i.id === id);
+  if (it && String(it.id).startsWith('tmp') && !it.tmp) { toast('還在存，等一下再試'); return null; }
+  return it || null;
+}
+
+/* 金鑰設定：第一次打開，或金鑰不對時出現。金鑰在試算表「設定」分頁的「金鑰」那一列。 */
+function keyScreen(msg){
+  S.ready = false;
+  document.getElementById('view').innerHTML = `<section class="band page"><div class="wrap">
+    ${ransom('設定金鑰','',true)}
+    <p class="lead">${esc(msg || '第一次使用，請貼上金鑰。之後這台裝置會記住。')}<br>金鑰在 Google 試算表「工作日誌」的「設定」分頁，類型是「系統」、名稱是「金鑰」那一列。</p>
+    <form id="keyForm" class="bubble"><div class="bubble-in"><div class="dlg"><label for="keyInput" class="sr">金鑰</label>
+      <textarea id="keyInput" style="min-height:64px" placeholder="貼上金鑰" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+      <div class="cap-foot"><span class="off">只存在這台裝置上</span>${B('連線','','type="submit"')}</div></div></div></form>
+  </div></section>`;
+  document.getElementById('nav').innerHTML = '';
+}
+async function boot(){
+  const cached = store.get(STATE_KEY);
+  if (cached) { try { load(JSON.parse(cached)); render(); } catch (e) {} }
+  if (!store.get(TOKEN_KEY)) { keyScreen(); return; }
+  if (!cached) document.getElementById('view').innerHTML = `<section class="band mast"><div class="wrap">${ransom('載入中','',true)}</div></section>`;
+  try { load(await call('getState')); S.anim = !cached; render(); flushQueue(); showBrief(); refreshStation(true); }
+  catch (e) { if (isAuth(e)) keyScreen(e.message.slice(5)); else if (!cached) keyScreen('連不上資料服務，請確認網路後再試。'); else toast('目前離線，顯示上次的資料'); }
+}
+
+/* ---------- 離線暫存 ---------- */
+function readQueue(){ try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; } }
+function writeQueue(q){ try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch (e) {} }
+let flushing = false;
+async function flushQueue(){
+  if (flushing || !navigator.onLine) return;
+  const q = readQueue(); if (!q.length) return;
+  flushing = true;
+  let sent = 0;
+  for (const rec of q) {
+    try { load(await call('addRecord', rec.sendId, rec.text, rec.time)); sent++; writeQueue(readQueue().filter(r => r.sendId !== rec.sendId)); }
+    catch (e) { break; }
+  }
+  flushing = false;
+  if (sent) { render(); toast(`恢復連線，補送 ${sent} 筆`); }
+}
+addEventListener('online', flushQueue);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { flushQueue(); refreshStation(); if (!document.querySelector('.sheet')) showBrief(); } });
+setInterval(flushQueue, 60000);
+
+/* ---------- 小工具 ---------- */
+const client = id => S.clients.find(c => c.id === id);
+const kase = id => S.cases.find(k => k.id === id);
+const nick = c => c ? (c.alias[0] || c.name) : '';
+/* 紀錄沒接上客戶、但內文提到已知客戶時，一樣顯示客戶牌（長的名稱先比） */
+const textClient = t => { let hit = null, len = 0; S.clients.forEach(c => [c.name, ...c.alias].forEach(n => { if (n && n.length > len && String(t).includes(n)) { hit = c; len = n.length; } })); return hit; };
+const itemClient = it => client(it.client) || textClient(it.text);
+const shortStep = s => S.stepShort[s] || s;
+const daysSince = d => { if (!d) return 0; const [y,m,dd] = d.split('-').map(Number), [ty,tm,td] = S.today.split('-').map(Number); return Math.round((new Date(ty,tm-1,td) - new Date(y,m-1,dd)) / 864e5); };
+function bare(t, c){
+  if (!c) return t;
+  let x = String(t);
+  [c.name, ...c.alias].filter(Boolean).forEach(n => { x = x.split(`「${n}」`).join(''); if (x.startsWith(n)) x = x.slice(n.length); });
+  x = x.replace(/^[\s，,、：:]+/, '').trim();
+  return x || t;
+}
+/* 「進度 → 送申請書：客戶說明天用印」拆成階段與那句話；不是換階段的回傳 step 空白 */
+function progParts(t){
+  const m = /^進度 → ([^：]+)(?:：([\s\S]*))?$/.exec(String(t)) || /^(開新案件)(?:：([\s\S]*))?$/.exec(String(t));
+  return m ? { step: m[1], note: m[2] || '' } : { step: '', note: String(t) };
+}
+function progHTML(it, c){ const p = progParts(it.text); return (p.step ? `<span class="st-tag">${esc(p.step)}</span>` : '') + esc(bare(p.note, c)); }
+/* 階段：P5 選單式任務清單。每列是編號＋階段名＋狀態；選中的後面墊朱紅鋸齒塊、放大、微斜，其他變暗；案件目前的階段標「目前」 */
+function stageBoard(cur, picked){
+  return `<div class="stages" role="group" aria-label="階段">${S.steps.map((s, i) => `<button class="stage${cur===s?' cur':''}" aria-pressed="${picked===s}" data-pick="${esc(s)}"${cur===s?' aria-disabled="true"':''}>
+    <span class="no">${String(i+1).padStart(2,'0')}</span><b>${esc(s)}</b><small>${cur===s?'<em>目前</em>':''}${esc(S.stepStatus[s]||'進行中')}</small></button>`).join('')}</div>`;
+}
+function toast(m){ const t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); t.innerHTML=`<span>${esc(m)}</span>`; document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
+
+/* 頁面標題：宋體、淡入（v3 起取代剪報字；函式名稱沿用，呼叫的地方不用改） */
+function ransom(text, cls='', anim=false){
+  const tag = cls.includes('md') ? 'h2' : 'h1';
+  return `<${tag} class="ttl ${cls}${anim?' anim':''}">${esc(text)}</${tag}>`;
+}
+
+/* 粗分（跟伺服器 roughSplit_ 同一套：待辦開頭、學到的規則、設定關鍵字），只用來讓畫面立刻有反應 */
+const TODO_RE = /^(待辦|要記得|記得|TODO)\s*[:：、]?\s*/i;
+function learnKey(t){
+  let s = String(t || '');
+  S.clients.flatMap(c => [c.name, ...c.alias]).filter(Boolean).sort((a, b) => b.length - a.length).forEach(n => { s = s.split(n).join(''); });
+  s = s.replace(/[0-9０-９\s，,、。．.:：;；!！?？()（）「」『』\-—~～\/／]+/g, '');
+  return s.length >= 2 ? s.slice(0, 30) : '';
+}
+function roughSplit(text){
+  const has = (s, l) => l.some(k => k && s.includes(k));
+  const rules = (S.learned || []).filter(r => r.type === '分類' && String(r.key).length >= 2).sort((a, b) => String(b.key).length - String(a.key).length);
+  return text.split(/[。\n；;！!]+/).map(s=>s.trim()).filter(Boolean).map(s=>{
+    const todo = TODO_RE.exec(s); if (todo && s.slice(todo[0].length).trim()) s = s.slice(todo[0].length).trim();
+    const c = S.clients.find(c => s.includes(c.name) || c.alias.some(a => s.includes(a)));
+    const key = learnKey(s), rule = key && rules.find(r => key.includes(String(r.key)));
+    const cat = todo ? '待辦' : rule ? rule.result : has(s,S.kwAsk) && !has(s,S.kwBizStrong) ? '諮詢' : has(s,S.kwBiz) ? '業務' : '日誌';
+    return { cat, client:c ? c.id : '', text:s };
+  });
+}
+
+/* 快記的剪報字：輸入框照常運作（輸入法、游標、選取都不變），字本身藏起來，上面疊一層完全對齊的剪報字。
+   只把認得的關鍵字做成色塊：客戶名稱＝黃紙、業務關鍵字＝朱紅，其他字保持整齊米白。
+   色塊只換底色、不改字寬，才能跟底下的游標對齊；關鍵字第一次被認出來時彈一下。選字（組字）時暫時顯示一般文字。 */
+let mirrorPrev = '', seenKeys = new Set();
+function keywordMarks(v){
+  const marks = new Array(v.length).fill(''), keys = new Set();
+  const mark = (word, cls) => { if (!word) return; let at = v.indexOf(word);
+    while (at >= 0) { if (marks.slice(at, at + word.length).every(x => !x)) { for (let j = at; j < at + word.length; j++) marks[j] = cls; keys.add(cls + ':' + at + ':' + word); } at = v.indexOf(word, at + word.length); } };
+  // 長的先標，避免「國立屏東高級中學」被「屏中」之類的短詞切開
+  const clientWords = S.clients.flatMap(c => [c.name, ...c.alias]).filter(Boolean).sort((a, b) => b.length - a.length);
+  clientWords.forEach(w => mark(w, 't-paper'));
+  [...(S.kwBiz || []), ...(S.steps || [])].filter(Boolean).sort((a, b) => b.length - a.length).forEach(w => mark(w, 't-red'));
+  return { marks, keys };
+}
+function syncMirror(animate, force){
+  const ta = document.getElementById('cap'), m = document.getElementById('capMirror'); if (!ta || !m) return;
+  const v = ta.value;
+  // 內容沒變就不重畫（重畫會把正在播的貼上動畫切掉），只移動游標
+  if (!force && !cmp && v === mirrorPrev) { placeCaret(); return; }
+  const { marks, keys } = keywordMarks(v);
+  const fresh = new Set();
+  if (animate) keys.forEach(k => { if (!seenKeys.has(k)) { const [, at, w] = k.split(':'); for (let j = +at; j < +at + w.length; j++) fresh.add(j); } });
+  seenKeys = keys;
+  // 剛打進來的字（選字完成或直接輸入，一次最多 4 個字；大段貼上不跑動畫）：像剪報字貼上去
+  let bornFrom = -1, bornTo = -1;
+  if (animate && !cmp) {
+    const old = mirrorPrev;
+    let p = 0; while (p < v.length && p < old.length && v[p] === old[p]) p++;
+    let q = 0; while (q < v.length - p && q < old.length - p && v[v.length-1-q] === old[old.length-1-q]) q++;
+    if (v.length - q - p <= 4) { bornFrom = p; bornTo = v.length - q; }
+  }
+  let html = '';
+  for (let i = 0; i < v.length; i++) {
+    // 組字中（注音還沒選字）：一個米白框框，注音寫在裡面，框框依打了幾個注音從底部填滿（--g 0～1）
+    if (cmp && i === cmp.start && cmp.len) {
+      const zy = v.slice(cmp.start, cmp.start + cmp.len), g = Math.min(cmp.len / 3, 1);
+      html += `<span class="cmp" data-i="${i}" style="--g:${g}"><b class="zy">${esc(zy)}</b></span>`;
+      i += cmp.len - 1; continue;
+    }
+    const ch = v[i];
+    if (ch === '\n') { html += `<br data-i="${i}">`; continue; }
+    if (ch === ' ') { html += `<span class="s" data-i="${i}"> </span>`; continue; }
+    const tile = marks[i] ? ' ' + marks[i] : '';
+    const han = marks[i] && /\p{Script=Han}/u.test(ch) ? ' han' : '';
+    const fx = fresh.has(i) ? ' pop' : (!marks[i] && i >= bornFrom && i < bornTo ? ' paste' : '');
+    const tilt = ((ch.charCodeAt(0) * 7 + i * 13) % 11) - 5;
+    html += `<span class="ch${tile}${han}${fx}" data-i="${i}" style="--t:${tilt}deg">${esc(ch)}</span>`;
+  }
+  m.innerHTML = html + (v.endsWith('\n') ? '&nbsp;' : '');
+  mirrorPrev = v;
+  ta.style.height = '0px'; ta.style.height = Math.max(ta.scrollHeight, ta.closest('.dk-cap') ? 66 : ta.closest('.m-cap') ? 84 : 112) + 'px';
+  placeCaret();
+}
+/* 游標：閃爍的米白空格，插在下一個字的位置；有選取範圍、組字中或沒在輸入時不顯示 */
+function placeCaret(){
+  const ta = document.getElementById('cap'), m = document.getElementById('capMirror'); if (!ta || !m) return;
+  let c = m.querySelector('.caret');
+  if (!c) { c = document.createElement('i'); c.className = 'caret'; }
+  c.hidden = !(document.activeElement === ta && ta.selectionStart === ta.selectionEnd && !cmp);
+  const before = m.querySelector(`[data-i="${ta.selectionStart}"]`);
+  if (before) m.insertBefore(c, before); else m.append(c);
+  // 上層是不透明的（蓋住 iPhone 組字的藍色底線），所以選取反白由這裡自己畫
+  const a = ta.selectionStart, b = ta.selectionEnd;
+  m.querySelectorAll('[data-i]').forEach(el => { const i = +el.dataset.i; el.classList.toggle('sel', a !== b && i >= a && i < b); });
+}
+document.addEventListener('selectionchange', () => { if (document.activeElement && document.activeElement.id === 'cap') placeCaret(); });
+['focusin', 'focusout', 'click', 'keyup'].forEach(t => document.addEventListener(t, e => { if (e.target.id === 'cap') setTimeout(placeCaret); }));
+let cmp = null;   // 組字中的範圍 { start, len }
+// 選字完成時，拿「組字開始前的內容」當比對基準，剛選進來的字才會被當成新字貼上去
+let preCmp = '';
+document.addEventListener('compositionstart', e => { if (e.target.id === 'cap') { preCmp = e.target.value; cmp = { start: e.target.selectionStart, len: 0 }; } });
+document.addEventListener('compositionupdate', e => { if (e.target.id === 'cap' && cmp) { cmp.len = (e.data || '').length; requestAnimationFrame(() => syncMirror(false, true)); } });
+document.addEventListener('compositionend', e => { if (e.target.id === 'cap') { cmp = null; mirrorPrev = preCmp; syncMirror(true); } });
+
+/* 背景：會呼吸的霧（fog.html）。點按、記下、換頁時霧會被撥動一下。
+   v2 的城市背景、閒置夜景、結案斬殺都拿掉了；City 留一個空殼，舊的呼叫不用改。 */
+const City = { on: false, mount(){}, unmount(){}, setView(){}, setCases(){}, setFocus(){}, slash(){} };
+function syncCity(){}
+
+/* ---------- 元件 ---------- */
+function stepper(k){
+  const idx = S.steps.indexOf(k.progress);
+  return `<span class="stepper" style="--n:${S.steps.length}" role="img" aria-label="進度：${esc(k.progress)}">${S.steps.map((s,i)=>`<span class="seg${i<idx?' past':''}${i===idx?' cur':''}${i===idx&&S.adv===k.id?' adv':''}"></span>`).join('')}</span>`;
+}
+/* 任務清單式的小元件：時間戳記、客戶牌、狀態標籤 */
+const tstamp = t => `<span class="stamp">${esc(t)}</span>`;
+const plate = c => c ? `<span class="plate">${esc(nick(c))}</span>` : '';
+const stateTag = s => `<span class="state${s==='進行中'?' doing':''}">${esc(s)}</span>`;
+
+/* 一筆紀錄的操作：點這筆才展開。改分類一鍵完成；刪除要按兩次 */
+function itemActs(it){
+  const acts = [];
+  if (it.prog) return `<span class="menu" role="group" aria-label="操作"><button data-edit="${it.id}">修改</button><button class="del" data-del="${it.id}" data-label="刪除">刪除</button></span>`;
+  if (it.cat==='業務' && !it.case) acts.push(`<button data-attach="${it.id}">歸到案件</button>`);
+  if (it.cat==='諮詢') acts.push(`<button data-attach="${it.id}">轉成案件</button>`);
+  CATS.filter(x => x !== it.cat).forEach(x => acts.push(`<button data-setcat="${it.id}" data-v="${x}">改成${x}</button>`));
+  acts.push(`<button data-edit="${it.id}">修改</button>`, `<button class="del" data-del="${it.id}" data-label="刪除">刪除</button>`);
+  return `<span class="menu" role="group" aria-label="操作">${acts.join('')}</span>`;
+}
+/* 一筆紀錄：時間戳記＋內容；操作收起來，點這筆才在下面展開斜切按鈕 */
+function itemHTML(it){
+  const c = itemClient(it);
+  return `<div class="item${it.fresh?' new':''}" data-menu tabindex="0" role="button" aria-expanded="false" aria-label="${esc(it.time)} ${esc(it.text)}，點開操作">
+    ${tstamp(it.time)}
+    <p>${plate(c)}${esc(bare(it.text, c))}${it.pending?' <span class="flag">待確認</span>':''}</p>
+    ${relHTML(relatedFiles(it))}
+    ${itemActs(it)}
+  </div>`;
+}
+/* 案件：一件一列。左＝客戶與動作・產品；中＝目前階段、換你／等對方、第幾步、分段進度條、最新一句；右＝幾天沒動（超過 14 天變紅）。
+   缺件那段是紅的；結案變淡、標「最終回」。 */
+function questHTML(k){
+  const c = client(k.client), fin = k.status==='已結案', d = daysSince(k.updated), lock = /缺件/.test(k.progress);
+  const idx = S.steps.indexOf(k.progress);
+  const last = S.items.filter(i => i.case===k.id && progParts(i.text).note).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time))[0];
+  const who = fin ? '<span class="who done">結案</span>' : k.status==='等待中' ? '<span class="who them">等對方</span>' : '<span class="who me">換你</span>';
+  return `<button class="quest${fin?' fin':''}${lock?' lock':''}${S.adv===k.id?' pop':''}${S.justClosed===k.id?' just':''}" data-prog="${k.id}" aria-label="${esc(c?c.name:'')} ${esc(k.action)}・${esc(k.product)}，${esc(k.progress)}，點一下更新進度">
+    <span class="q-name"><strong>${esc(c?c.name:'未指定客戶')}</strong><span>${esc(k.action)}・${esc(k.product)}</span></span>
+    <span class="q-meta"><span class="q-lab"><b>${esc(shortStep(k.progress))}</b>${who}${idx >= 0 ? `<i>${idx + 1}／${S.steps.length}</i>` : ''}</span>
+      ${stepper(k)}${last && !fin ? `<span class="q-note">${esc(bare(progParts(last.text).note, c))}</span>` : ''}${relHTML(caseFiles(k), true)}${fin ? '' : formChips(k.forms, true)}</span>
+    <span class="q-age${d>14 && !fin?' hot':''}">${fin ? '<span>最終回</span>' : `<b>${d===0?'今':d}</b><span>${d===0?'天有動':'天沒動'}</span>`}</span>
+  </button>`;
+}
+/* 現在時間與「多久以前」：打卡紙與來電卡用，每秒由 tickLive() 更新 */
+const nowHM = () => stamp(new Date()).slice(11);
+const minsSince = hm => { const [h, m] = String(hm).split(':').map(Number), n = new Date(); return n.getHours() * 60 + n.getMinutes() - (h * 60 + m); };
+const agoText = hm => { const m = minsSince(hm); return m < 1 ? '剛剛' : m < 60 ? m + ' 分鐘前' : Math.floor(m / 60) + ' 小時前'; };
+const waitText = hm => { const n = new Date(), [h, m] = String(hm).split(':').map(Number), s = Math.max(0, (n.getHours() * 60 + n.getMinutes() - h * 60 - m) * 60 + n.getSeconds());
+  return pad(Math.floor(s / 3600)) + ':' + pad(Math.floor(s / 60) % 60) + ':' + pad(s % 60); };
+function tickLive(){
+  const n = new Date(), clock = document.getElementById('pClock');
+  if (clock) clock.innerHTML = `${nowHM()}<small>:${pad(n.getSeconds())}</small>`;
+  document.querySelectorAll('[data-wait]').forEach(el => { el.textContent = waitText(el.dataset.wait); });
+  if (n.getSeconds() === 0) {
+    document.querySelectorAll('[data-ago]').forEach(el => { el.textContent = agoText(el.dataset.ago); });
+    const nowEl = document.getElementById('pNow'); if (nowEl) nowEl.textContent = nowHM();
+  }
+}
+setInterval(() => { if (!document.hidden) tickLive(); }, 1000);
+/* 日誌＝打卡紙：時間打在左欄，每筆最多兩行，字多的點開看全文（同時出現修改／刪除等操作） */
+function punchHTML(it){
+  const c = itemClient(it), t = bare(it.text, c);
+  return `<div class="item punch${it.fresh?' new':''}" data-menu tabindex="0" role="button" aria-expanded="false" aria-label="${esc(it.time)} ${esc(it.text)}，點開操作">
+    <span class="p-t">${esc(it.time)}</span>
+    <p>${plate(c)}<span class="clamp2">${esc(t)}</span><span class="p-ago" data-ago="${esc(it.time)}">${agoText(it.time)}</span>${t.length > 40 ? '<span class="more-t">展開全文</span>' : ''}${it.pending?' <span class="flag">待確認</span>':''}</p>
+    ${relHTML(relatedFiles(it))}
+    ${itemActs(it)}
+  </div>`;
+}
+/* 諮詢＝來電卡：還沒回的是完整大卡（排最上面，可以按「已回覆」或「轉案件」）；回覆過的收成一行一通的通話紀錄 */
+const askReply = it => it.reply || ((/(已回覆|已回|已答覆|已告知|已說明)[，,：:\s]*(.*)$/.exec(it.text) || [])[2] ?? '') || (/(已回覆|已回|已答覆|已告知|已說明)/.test(it.text) ? '已回覆' : '');
+function callHTML(it){
+  const c = itemClient(it), t = bare(it.text, c);
+  return `<div class="item call${it.fresh?' new':''}" data-menu tabindex="0" role="button" aria-expanded="false" aria-label="${esc(c?c.name:'')} 來電：${esc(it.text)}，點開操作">
+    <span class="c-bar"><b><i class="c-led" aria-hidden="true"></i>來電</b><span>${esc(it.time)}</span></span>
+    <span class="c-in"><strong class="c-who">${c ? esc(c.name) : '還不知道是誰'}</strong>
+      <span class="c-q"><span class="clamp3">${esc(t)}</span>${t.length > 50 ? '<span class="more-t">看全文</span>' : ''}</span>${relHTML(relatedFiles(it))}
+      <span class="c-f"><span class="c-wait">等了<b data-wait="${esc(it.time)}">${waitText(it.time)}</b></span><span class="c-acts"><button class="c-reply" data-reply="${it.id}">已回覆</button><button class="ask-go" data-attach="${it.id}">轉案件</button></span></span></span>
+    ${itemActs(it)}
+  </div>`;
+}
+function callRowHTML(it){
+  const c = itemClient(it), ans = askReply(it);
+  return `<div class="item callrow${it.fresh?' new':''}" data-menu tabindex="0" role="button" aria-expanded="false" aria-label="${esc(it.time)} ${esc(c?c.name:'')}：${esc(it.text)}，點開看回覆與操作">
+    <span class="r-t">${esc(it.time)}</span><span class="r-w">${c ? esc(nick(c)) : '未知'}</span><span class="r-x">${esc(bare(it.text, c))}</span>
+    <span class="r-a">→ ${esc(ans)}</span>${itemActs(it)}
+  </div>`;
+}
+const panelHTML = k => questHTML(k);
+const tabs = cur => `<div class="tabs" role="group" aria-label="切換"><button aria-pressed="${cur==='today'}" data-hometab="today"><span>今天</span></button><button aria-pressed="${cur==='week'}" data-hometab="week"><span>週報</span></button></div>`;
+
+/* ---------- 頁面 ---------- */
+function renderHome(){
+  const cap = `<section class="band b-paper cap-band"><div class="wrap"><form class="bubble" id="capForm"><div class="bubble-in"><span class="nameplate" aria-hidden="true">今天</span><span class="tail" aria-hidden="true"></span><div class="dlg">
+    <label for="cap" class="sr">快記</label>
+    <div class="typebox"><textarea id="cap" rows="4"></textarea><div class="mirror" id="capMirror" aria-hidden="true"></div></div>
+    <div class="cap-foot">${navigator.onLine?'':'<span class="off">離線中，先存在這台裝置</span>'}${B('記下來','','type="submit"')}</div>
+  </div></div></form></div></section>`;
+  if (DESK()) return deskHead() + (S.homeTab==='week' ? weekHTML() : renderDeskHome(cap));
+  if (S.homeTab==='week') return mobileHead() + weekHTML();
+  return renderMobileHome(cap);
+}
+/* ---------- 行程月曆（和風） ----------
+   標題是月份＋和風月名（神無月…）＋季節紋（春櫻／夏青海波／秋紅葉／冬雪結晶），月曆底紋跟著季節換；
+   節氣（寒露、霜降…，日期取常見的那天）小字標在格子裡；有行程的日子底下一顆點（多於一件標數字）。
+   點一格就在下面列出那天的行程；‹ › 換月份，不在本月時多一個「回到今天」。 */
+const WAMEI = ['睦月','如月','彌生','卯月','皐月','水無月','文月','葉月','長月','神無月','霜月','師走'];
+const seasonOf = m => m >= 3 && m <= 5 ? 'spring' : m >= 6 && m <= 8 ? 'summer' : m >= 9 && m <= 11 ? 'autumn' : 'winter';
+const SEASON_ZH = { spring: '春', summer: '夏', autumn: '秋', winter: '冬' };
+const SEKKI = { '1-5':'小寒','1-20':'大寒','2-4':'立春','2-19':'雨水','3-5':'驚蟄','3-20':'春分','4-4':'清明','4-20':'穀雨','5-5':'立夏','5-21':'小滿','6-5':'芒種','6-21':'夏至',
+  '7-7':'小暑','7-22':'大暑','8-7':'立秋','8-23':'處暑','9-7':'白露','9-23':'秋分','10-8':'寒露','10-23':'霜降','11-7':'立冬','11-22':'小雪','12-7':'大雪','12-21':'冬至' };
+const MOTIF = {
+  spring: '<svg viewBox="-10 -10 20 20" aria-hidden="true">' + [0,72,144,216,288].map(a => `<path transform="rotate(${a})" d="M0 -.5C-3.4 -3 -3.2 -7.4 -1.1 -9.2L0 -7.9 1.1 -9.2C3.2 -7.4 3.4 -3 0 -.5Z"/>`).join('') + '<circle r="1.7" class="core"/></svg>',
+  summer: '<svg viewBox="-10 -10 20 20" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7"><path d="M-9 7A9 9 0 0 1 9 7M-6 7A6 6 0 0 1 6 7M-3 7A3 3 0 0 1 3 7"/></g></svg>',
+  autumn: '<svg viewBox="-10 -10 20 20" aria-hidden="true"><path d="M0 -9.5 1.9 -4.2 7 -6.4 4.3 -1.4 9.4 .6 3.4 1.9 4.3 7.6 0 4.2 -4.3 7.6 -3.4 1.9 -9.4 .6 -4.3 -1.4 -7 -6.4 -1.9 -4.2Z"/><path d="M0 4.2V9.6" stroke="currentColor" stroke-width="1.3"/></svg>',
+  winter: '<svg viewBox="-10 -10 20 20" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">' + [0,60,120].map(a => `<path transform="rotate(${a})" d="M0 -8.5V8.5M-2.6 -6.3 0 -4.2 2.6 -6.3M-2.6 6.3 0 4.2 2.6 6.3"/>`).join('') + '</g></svg>',
+};
+/* 台灣放假日：行政院人事行政總處公告的辦公日曆（2026、2027 年；資料取自 ruyut/TaiwanCalendar 整理的官方 JSON）。
+   週六日本來就是休假；連續 3 天以上的休假算連假，月曆上畫一條連假色帶。之後的年份公告後要補進來。 */
+const TW_HOLI = Object.fromEntries('20260101開國紀念日|20260215小年夜|20260216農曆除夕|20260217春節|20260218春節|20260219春節|20260220補假|20260227補假|20260228和平紀念日|20260403補假|20260404兒童節|20260405清明節|20260406補假|20260501勞動節|20260619端午節|20260925中秋節|20260928孔子誕辰紀念日/教師節|20261009補假|20261010國慶日|20261025臺灣光復暨金門古寧頭大捷紀念日|20261026補假|20261225行憲紀念日|20270101開國紀念日|20270204小年夜|20270205農曆除夕|20270206春節|20270207春節|20270208春節|20270209補假|20270210補假|20270228和平紀念日|20270301補假|20270404兒童節|20270405清明節|20270406補假|20270430補假|20270501勞動節|20270609端午節|20270915中秋節|20270928孔子誕辰紀念日/教師節|20271010國慶日|20271011補假|20271025臺灣光復暨金門古寧頭大捷紀念日|20271224補假|20271225行憲紀念日|20271231補假'.split('|').map(x => [`${x.slice(0, 4)}-${x.slice(4, 6)}-${x.slice(6, 8)}`, x.slice(8)]));
+const HOLI_SHORT = { '開國紀念日': '元旦', '農曆除夕': '除夕', '和平紀念日': '228', '孔子誕辰紀念日/教師節': '教師節', '臺灣光復暨金門古寧頭大捷紀念日': '光復節', '行憲紀念日': '行憲' };
+const dsOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const isOff = d => d.getDay() === 0 || d.getDay() === 6 || !!TW_HOLI[dsOf(d)];
+/* 這天所在的連續休假：回傳 { len, no }（第幾天），不到 3 天回傳 null */
+function offRun(y, m, d){
+  const at = new Date(y, m - 1, d); if (!isOff(at)) return null;
+  let a = 0, b = 0;
+  while (a < 14 && isOff(new Date(y, m - 1, d - a - 1))) a++;
+  while (b < 14 && isOff(new Date(y, m - 1, d + b + 1))) b++;
+  return a + b + 1 >= 3 ? { len: a + b + 1, no: a + 1 } : null;
+}
+const evOn = ds => (S.events || []).filter(e => e.date === ds || (e.end && e.date <= ds && ds <= e.end));
+function calHTML(){
+  const cur = S.calMonth || S.today.slice(0, 7), [y, m] = cur.split('-').map(Number), sel = S.calSel || S.today, se = seasonOf(m);
+  const first = new Date(y, m - 1, 1).getDay(), days = new Date(y, m, 0).getDate();
+  let cells = '<span class="cal-x"></span>'.repeat(first);
+  for (let d = 1; d <= days; d++) {
+    const ds = `${y}-${pad(m)}-${pad(d)}`, n = evOn(ds).length, sk = SEKKI[`${m}-${d}`], dow = (first + d - 1) % 7, ho = TW_HOLI[ds], run = offRun(y, m, d);
+    const tag = ho ? (HOLI_SHORT[ho] || ho) : '',   // 格子裡只標國定假日；節氣點那天才在下面顯示
+    rc = run ? (run.no === 1 ? ' run run-s' : run.no === run.len ? ' run run-e' : ' run') : '';
+    cells += `<button class="cal-d${ds===S.today?' today':''}${ds===sel?' sel':''}${dow===0||dow===6?' we':''}${ho?' holi':''}${rc}${ds<S.today?' past':''}" data-calday="${ds}" aria-pressed="${ds===sel}" aria-label="${m}月${d}日${ho?'，'+ho:''}${run?`，連假第${run.no}天`:''}${sk?'，'+sk:''}${n?`，${n} 個行程`:''}">
+      <b>${d}</b>${tag ? `<small>${esc(tag)}</small>` : ''}${n ? `<i class="cal-dot">${n > 1 ? n : ''}</i>` : ''}</button>`;
+  }
+  const [sy, sm, sd] = sel.split('-').map(Number), evs = evOn(sel), selHo = TW_HOLI[sel], selRun = offRun(sy, sm, sd), selSk = SEKKI[`${sm}-${sd}`];
+  const notes = [selHo, selRun ? `連假第 ${selRun.no} 天・共 ${selRun.len} 天` : '', selSk ? `節氣・${selSk}` : ''].filter(Boolean);
+  const list = evs.map(e => { const k = e.case && kase(e.case), cl = k && client(k.client);
+    return `<div class="cal-ev"><span class="cal-t">${e.t || '全天'}</span><span class="cal-dsc">${esc(e.d)}${e.end ? `<small>${esc(e.date.slice(5).replace('-','/'))}–${esc(e.end.slice(5).replace('-','/'))}</small>` : ''}${k ? `<small>${esc(nick(cl))}・${esc(k.action)}・${esc(k.product)}</small>` : ''}</span></div>`; }).join('');
+  return `<div class="cal cal-${se}">
+    <div class="cal-h"><button class="cal-nav" data-calm="-1" aria-label="上個月">‹</button>
+      <div class="cal-title"><span class="cal-season">${MOTIF[se]}${SEASON_ZH[se]}</span><b>${m}<small>月</small></b><span class="cal-wa">${WAMEI[m - 1]}<small>${y}</small></span></div>
+      <button class="cal-nav" data-calm="1" aria-label="下個月">›</button></div>
+    <div class="cal-w" aria-hidden="true">${'日一二三四五六'.split('').map(w => `<span>${w}</span>`).join('')}</div>
+    <div class="cal-g">${cells}</div>
+    <div class="cal-list"><div class="cal-lh"><b>${sm}/${sd}</b><span>週${'日一二三四五六'[new Date(sy, sm - 1, sd).getDay()]}${sel===S.today?'・今天':''}</span>${cur !== S.today.slice(0, 7) ? '<button class="cal-back" data-caltoday>回到今天</button>' : ''}</div>
+      ${notes.length ? `<div class="cal-notes">${notes.map(x => `<span>${esc(x)}</span>`).join('')}</div>` : ''}
+      ${list || '<p class="cal-none">這天沒有行程</p>'}</div>
+  </div>`;
+}
+
+/* ---------- 手機首頁 ----------
+   一行日期列（今日簡報、週報）→ 記一筆 → 四個大分頁「業務／日誌／諮詢／追蹤」（捲動時黏在上面）→ 分頁內容。
+   一次只看一欄，不用一路往下滑；追蹤＝要你推進＋待確認＋行程，有待確認時分頁上亮紅點。 */
+function mobileHead(){
+  const [y,m,d] = S.today.split('-').map(Number), wd = '日一二三四五六'[new Date(y,m-1,d).getDay()], qn = readQueue().length, week = S.homeTab==='week';
+  return `<header class="mh"><span class="mh-date"><b>${m}/${d}</b><small>週${wd}</small></span>
+    ${qn ? `<span class="tag warn">未送出 ${qn}</span>` : ''}${navigator.onLine ? '' : '<span class="tag">離線</span>'}
+    <span class="mh-acts">${week ? B('← 今天','ghost sm','data-hometab="today"') : B('今日簡報','ghost sm','data-brief') + B('週報','ghost sm','data-hometab="week"')}</span></header>`;
+}
+function renderMobileHome(cap){
+  const todays = S.items.filter(i => i.date===S.today && !i.prog);
+  const list = S.cases.filter(k => k.status==='進行中' || k.updated===S.today || todays.some(i => i.case===k.id))
+    .sort((a, b) => urgency(a) - urgency(b) || daysSince(b.updated) - daysSince(a.updated));
+  const loose = todays.filter(i => i.cat==='業務' && !i.case).slice().reverse();
+  const logs = todays.filter(i => i.cat==='日誌').slice().sort((x, y) => x.time.localeCompare(y.time));
+  const asks = todays.filter(i => i.cat==='諮詢').slice().reverse(), waiting = asks.filter(i => !askReply(i)), answered = asks.filter(i => askReply(i));
+  const { live, sch, pend, waiting: waitN, open } = trackerData();
+  const openPj = (S.projects || []).filter(p => p.stage < PJ_N()).sort(pjSort);
+  const tab = S.mtab || 'biz';
+  const tabs = [['biz', '業務', list.length + loose.length], ['log', '日誌', logs.length], ['ask', '諮詢', waiting.length || asks.length], ['track', '追蹤', live.length]];
+  const bar = `<nav class="mtabs" aria-label="今天的內容">${tabs.map(([id, l, n]) => `<button data-mtab="${id}" aria-pressed="${tab===id}"><span>${l}</span><b>${n}</b>${id==='track' && open ? '<i class="m-dot" aria-label="有待確認"></i>' : id==='ask' && waiting.length ? '<i class="m-dot" aria-label="有待回覆"></i>' : ''}</button>`).join('')}</nav>`;
+  const empty = t => `<p class="m-empty">${t}</p>`;
+  let body = '';
+  if (tab==='biz') body = (loose.length ? `<div class="tray"><span class="tray-h">待歸案</span>${loose.map(itemHTML).join('')}</div>` : '')
+    + (list.length ? `<div class="quests">${list.map(questHTML).join('')}</div>` : empty('目前沒有進行中的案件'))
+    + `<div class="add-case">${B('＋ 開新案件','ghost','data-opencase')}</div>`;
+  if (tab==='log') { const am = logs.filter(i => i.time < '12:00'), pm = logs.filter(i => i.time >= '12:00');
+    body = logs.length ? `<div class="strip"><div class="p-head"><span>今天做了什麼</span><b class="p-clock" id="pClock" aria-label="現在時間">${nowHM()}</b></div><div class="p-scroll">
+      ${am.length ? `<span class="p-half">上午</span>${am.map(punchHTML).join('')}` : ''}${pm.length ? `<span class="p-half">下午</span>${pm.map(punchHTML).join('')}` : ''}
+      <div class="p-now"><b id="pNow">${nowHM()}</b><i></i><span>現在　下一筆會打在這裡</span></div></div><div class="p-sum">共<b>${logs.length}</b>筆</div></div>` : empty('今天還沒有日誌'); }
+  if (tab==='ask') { const shown = S.askAll ? answered : answered.slice(0, 3);
+    body = asks.length ? waiting.map(callHTML).join('') + (answered.length ? `<div class="c-log"><span class="c-log-h"><b>已回覆</b><span>${answered.length} 通</span></span>${shown.map(callRowHTML).join('')}
+      ${answered.length > 3 ? `<button class="c-more" data-askall>${S.askAll ? '收起' : '展開其餘 ' + (answered.length - 3) + ' 通'}</button>` : ''}</div>` : '') : empty('今天還沒有諮詢'); }
+  if (tab==='track') body = `${stationHTML()}<section class="m-sec"><h3 class="m-h">待確認<span>${open} 件</span></h3>${pend || empty('沒有要確認的')}</section>
+    <section class="m-sec"><h3 class="m-h">要你推進<span>要你主動追的 ${live.length} 件</span></h3><div class="panels">${live.map(panelHTML).join('') || empty('目前沒有要主動追的案件')}</div>
+      <p class="aside">等客戶或受理單位回覆的 ${waitN} 件在「案件」頁</p></section>
+    ${openPj.length ? `<section class="m-sec"><h3 class="m-h">專案<span>${openPj.length} 件進行中</span></h3><div class="quests">${openPj.map(projectRow).join('')}</div></section>` : ''}
+    <section class="m-sec"><h3 class="m-h">行程</h3>${calHTML()}</section>`;
+  return `${mobileHead()}<div class="m-cap">${cap}</div>${todoHTML(true)}${bar}<section class="mt-body mt-${tab}">${body}</section>`;
+}
+
+/* ---------- 電腦版首頁（桌面背景版） ----------
+   上面「今天」標題＋日期＋今日簡報，下面一條「記一筆」；中間案件列（今天動到的＋進行中的，缺件、太久沒動的排前面）；
+   最下面左邊日誌、右邊諮詢。背景是霧（fog.html）。 */
+const urgency = k => (k.status==='已結案' ? 9 : 0) + (/缺件/.test(k.progress) ? 0 : daysSince(k.updated) > 14 ? 1 : 2);
+function deskHead(){
+  const [y,m,d] = S.today.split('-').map(Number), wd = '日一二三四五六'[new Date(y,m-1,d).getDay()], qn = readQueue().length, week = S.homeTab==='week';
+  return `<header class="dk-head">${ransom(week ? '本週週報' : '今天', 'md', S.anim)}
+    <span class="dk-meta"><b>${m}/${d}</b><span>（${wd}）</span>${qn?`<span class="tag warn">未送出 ${qn} 筆</span>`:''}${navigator.onLine?'':'<span class="tag">離線中</span>'}${week ? '' : B('今日簡報','ghost sm','data-brief')}</span></header>`;
+}
+function renderDeskHome(cap){
+  const todays = S.items.filter(i => i.date===S.today && !i.prog);
+  const list = S.cases.filter(k => k.status==='進行中' || k.updated===S.today || todays.some(i => i.case===k.id))
+    .sort((a, b) => urgency(a) - urgency(b) || daysSince(b.updated) - daysSince(a.updated));
+  const loose = todays.filter(i => i.cat==='業務' && !i.case).slice().reverse();
+  const board = `<section class="dk-board" aria-label="案件">
+      ${loose.length ? `<div class="tray"><span class="tray-h">待歸案</span>${loose.map(itemHTML).join('')}</div>` : ''}
+      <div class="quests">${list.map(questHTML).join('') || '<p class="dk-empty">目前沒有進行中的案件</p>'}</div>
+      <div class="add-case">${B('＋ 開新案件','ghost sm','data-opencase')}</div></section>`;
+  const [y,m,d] = S.today.split('-').map(Number), wd = '日一二三四五六'[new Date(y,m-1,d).getDay()];
+  const logs = todays.filter(i => i.cat==='日誌').slice().sort((x, y) => x.time.localeCompare(y.time));
+  const am = logs.filter(i => i.time < '12:00'), pm = logs.filter(i => i.time >= '12:00');
+  const tc = `<section class="tc" aria-label="日誌">
+      <header class="tc-h"><span class="tc-t">日誌</span><span class="tc-d">${m}/${d}（${wd}）・日誌 ${logs.length} 筆</span><b class="tc-clock" id="pClock" aria-label="現在時間">${nowHM()}</b></header>
+      <div class="tc-rows">${am.length ? `<span class="tc-half">上午</span>${am.map(punchHTML).join('')}` : ''}${pm.length ? `<span class="tc-half">下午</span>${pm.map(punchHTML).join('')}` : ''}
+        <div class="p-now"><b id="pNow">${nowHM()}</b><i></i><span>現在　下一筆會打在這裡</span></div></div></section>`;
+  const asks = todays.filter(i => i.cat==='諮詢').slice().reverse(), waiting = asks.filter(i => !askReply(i)), answered = asks.filter(i => askReply(i));
+  const shown = S.askAll ? answered : answered.slice(0, 3);
+  const ph = `<section class="ph" aria-label="諮詢">
+      <div class="ph-bar"><span class="dot${waiting.length ? ' on' : ''}"></span>諮詢<span class="ph-n">諮詢 ${asks.length} 通</span>${waiting.length ? `<em>${waiting.length} 通待回</em>` : ''}</div>
+      ${waiting.map(phCardHTML).join('')}
+      ${answered.length ? `<div class="ph-log">${shown.map(callRowHTML).join('')}${answered.length > 3 ? `<button class="c-more" data-askall>${S.askAll ? '收起' : '展開其餘 ' + (answered.length - 3) + ' 通'}</button>` : ''}</div>` : ''}
+      ${asks.length ? '' : '<p class="dk-empty">今天還沒有來電</p>'}</section>`;
+  return `<div class="dk">
+    <div class="dk-cap">${cap.replace('aria-hidden="true">今天</span>', 'aria-hidden="true">記一筆</span>')}</div>
+    ${todoHTML(false)}
+    ${board}
+    <div class="dk-two">${tc}${ph}</div></div>`;
+}
+/* 電腦版來電卡：還沒回的那通（話筒會響、計時）；回過的收成一行一通 */
+const PHONE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25c1.1.37 2.3.57 3.6.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>';
+function phCardHTML(it){
+  const c = itemClient(it), t = bare(it.text, c);
+  return `<div class="item ph-card${it.fresh?' new':''}" data-menu tabindex="0" role="button" aria-expanded="false" aria-label="${esc(c?c.name:'')} 來電：${esc(it.text)}，點開操作">
+    <span class="ph-icon">${PHONE_SVG}</span>
+    <div class="ph-main"><div class="ph-who">${c ? esc(c.name) : '還不知道是誰'}<small>${esc(it.time)} 來電</small></div>
+      <p class="ph-q"><span class="clamp3">${esc(t)}</span>${t.length > 60 ? '<span class="more-t">看全文</span>' : ''}</p>${relHTML(relatedFiles(it))}
+      <div class="ph-f"><span class="ph-wait">等了<b data-wait="${esc(it.time)}">${waitText(it.time)}</b></span><button class="ph-btn c-reply" data-reply="${it.id}">已回覆</button><button class="ph-btn ghost ask-go" data-attach="${it.id}">轉案件</button></div>
+      ${itemActs(it)}</div>
+  </div>`;
+}
+
+/* 要你推進的案件、待確認、行程：手機放在首頁下面；電腦版放在右邊固定欄，每一頁都看得到 */
+function trackerData(){
+  const live = S.cases.filter(k => k.status==='進行中' || (k.status==='已結案' && k.closed===S.today))
+    .sort((x,y)=>(x.status==='已結案')-(y.status==='已結案') || String(x.updated).localeCompare(String(y.updated)));
+  let last='', sch='';
+  S.sched.forEach(s => { if (s.day!==last){ sch+=`<div class="day">${s.day}</div>`; last=s.day; } const k=kase(s.case);
+    sch += `<div class="sch"><span class="stamp lg">${esc(s.t)}</span><span class="sch-d">${esc(s.d)}${k?`<small>${esc(k.action)}・${esc(k.product)}</small>`:''}</span></div>`; });
+  const pend = S.pending.map(p => p.done ? `<div class="done-line"><span class="flag done">完成</span>${esc(p.done)}</div>` : `<div class="pend"><span class="flag">${esc(p.kind)}</span><div class="q"><q>${esc(p.text)}</q> ${esc(p.msg)}</div><div class="acts">${
+      p.options ? p.options.map(o=>B(esc(o),'ghost sm',`data-resolve="${p.id}" data-val="${esc(o)}"`)).join('')
+      : p.guess ? B('是，記住別名','sm',`data-resolve="${p.id}" data-val="yes"`) + B('不是，建新客戶','ghost sm',`data-resolve="${p.id}" data-val="new"`)
+      : B('建立新客戶','sm',`data-resolve="${p.id}" data-val="new"`) + B('不是客戶','ghost sm',`data-resolve="${p.id}" data-val="skip"`)}</div></div>`).join('');
+  return { live, sch, pend, waiting: S.cases.filter(k=>k.status==='等待中').length, open: S.pending.filter(p=>!p.done).length };
+}
+function railHTML(){
+  const { sch, pend, open } = trackerData();
+  const fight = S.cases.filter(k => k.status==='進行中').sort((a, b) => urgency(a) - urgency(b) || daysSince(b.updated) - daysSince(a.updated));
+  const wait = S.cases.filter(k => k.status==='等待中').sort((a, b) => daysSince(b.updated) - daysSince(a.updated));
+  const row = k => { const c = client(k.client), d = daysSince(k.updated);
+    return `<button class="rc-row" data-prog="${k.id}" aria-label="${esc(c?c.name:'')}，${esc(k.progress)}，${d}天沒動，點一下更新進度"><b>${esc(nick(c) || '未指定客戶')}</b><span class="${/缺件/.test(k.progress)?'lock':''}">${esc(shortStep(k.progress))}</span><em class="${d>14?'hot':''}">${d===0?'今天':d+' 天'}</em></button>`; };
+  const card = (h, n, body) => `<section class="rc"><h3 class="rc-h">${h}<span>${n}</span></h3>${body}</section>`;
+  const pjs = (S.projects || []).filter(p => p.stage < PJ_N()).sort(pjSort);
+  const pjRow = p => { const c = client(p.client), d = daysSince(p.updated), me = pjBall(p) === '我';
+    return `<button class="rc-row" data-proj="${p.id}" aria-label="${esc(c?c.name:'')} ${esc(p.name)}，${esc(pjStepName(p, p.stage))}，點開專案"><b>${esc(nick(c) || '未指定客戶')}・${esc(p.name)}</b><span class="${me?'me':''}">${me ? '換你' : '等' + esc(pjBall(p))}</span><em class="${d>14?'hot':''}">${d===0?'今天':d+' 天'}</em></button>`; };
+  return stationHTML() + card('要你推進', fight.length + ' 件', fight.map(row).join('') || '<p class="rc-empty">沒有要你推進的案件</p>')
+    + (pjs.length ? card('專案', pjs.length + ' 件', pjs.map(pjRow).join('')) : '')
+    + card('等待中', wait.length + ' 件', wait.map(row).join('') || '<p class="rc-empty">沒有在等回覆的案件</p>')
+    + card('待確認', open + ' 件', pend || '<p class="rc-empty">沒有要確認的</p>')
+    + card('行程', '', calHTML());
+}
+/* 週報＝雜誌編排：刊頭（WEEKLY＋第幾週）→ 本週數字（大數字）→ 主欄「業務」專題（客戶名大字、動作・產品、狀態標籤）
+   ＋側欄「諮詢」問答引言與「下週要追」核取清單。週報內容是排程寫的純文字（# 標題＋一行一件），在這裡拆開排版；
+   認不得的段落照原文列出，不會漏。 */
+function parseWeek(body){
+  const secs = []; let cur = null;
+  String(body || '').split('\n').forEach(l => { l = l.trim(); if (!l) return;
+    if (l.startsWith('# ')) { cur = { h: l.slice(2).trim(), lines: [] }; secs.push(cur); return; }
+    if (!cur) { cur = { h: '', lines: [] }; secs.push(cur); }
+    cur.lines.push(l.replace(/^[-・•*]\s*/, '')); });
+  return secs;
+}
+function weekHTML(){
+  const w = S.weekly;
+  const top = `<div class="wk-tabs">${tabs('week')}</div>`;
+  if (!w) return `<section class="band wk"><div class="wrap">${top}<div class="wk-paper"><p class="wk-none">第一份週報會在週五 17:30 整理時產生。</p></div></div></section>`;
+  const secs = parseWeek(w.body), pick = re => secs.find(s => re.test(s.h));
+  const biz = pick(/業務/), ask = pick(/諮詢/), next = pick(/下週|要追/), sum = pick(/這週|本週|統計|數字/);
+  const rest = secs.filter(s => ![biz, ask, next, sum].includes(s));
+  const sumText = sum ? sum.lines.join(' ') : '', num = re => (re.exec(sumText) || [])[1];
+  const stats = [['紀錄', num(/紀錄\s*(\d+)/), '筆'], ['新案件', num(/新案件\s*(\d+)/), '件'], ['結案', num(/結案\s*(\d+)/), '件'],
+    ['諮詢', ask ? String(ask.lines.length) : null, '通']].filter(s => s[1] != null);
+  const bizRow = l => { const m = /^(\S+)\s+(\S+・\S+)\s+(.+)$/.exec(l);
+    return m ? `<li class="wk-biz"><b>${esc(m[1])}</b><span class="wk-kind">${esc(m[2])}</span><span class="wk-st">${esc(m[3])}</span></li>` : `<li class="wk-biz"><span class="wk-st">${esc(l)}</span></li>`; };
+  const askRow = l => { const m = /^(\S+)\s+(.+)$/.exec(l);
+    return `<li class="wk-q">${m ? `<b>${esc(m[1])}</b><q>${esc(m[2])}</q>` : `<q>${esc(l)}</q>`}</li>`; };
+  const sec = (no, title, en, body) => `<section class="wk-sec"><h3 class="wk-h"><span class="wk-no">${no}</span>${esc(title)}<small>${en}</small></h3>${body}</section>`;
+  let no = 0; const n = () => String(++no).padStart(2, '0');
+  return `<section class="band wk"><div class="wrap">${top}<article class="wk-paper">
+    <header class="wk-mast"><span class="wk-brand">週報</span><span class="wk-issue"><small>第</small><b>${esc(w.week)}</b><small>週</small></span>
+      <span class="wk-tag">工作日誌・本週報告</span></header>
+    ${stats.length ? `<div class="wk-stats">${stats.map(([l, v, u]) => `<div><b>${esc(v)}</b><span>${l}<small>${u}</small></span></div>`).join('')}</div>` : ''}
+    <div class="wk-grid">
+      <div class="wk-main">${biz ? sec(n(), biz.h, '', `<ul class="wk-list">${biz.lines.map(bizRow).join('')}</ul>`) : ''}
+        ${rest.map(s => sec(n(), s.h || '其他', '', `<ul class="wk-plain">${s.lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`)).join('')}</div>
+      <aside class="wk-side">${ask ? sec(n(), ask.h, '', `<ul class="wk-list">${ask.lines.map(askRow).join('')}</ul>`) : ''}
+        ${next ? sec(n(), next.h, '', `<ul class="wk-next">${next.lines.map(l => `<li><i aria-hidden="true"></i>${esc(l)}</li>`).join('')}</ul>`) : ''}</aside>
+    </div></article></div></section>`;
+
+}
+function renderTimeline(){
+  const q = readQueue().map(r => ({id:'q:'+r.sendId, time:r.time, raw:r.text, state:'未送出', segs:[]}));
+  const all = [...q, ...S.records];
+  const days = {}; all.forEach(r => { const d = r.time.slice(0,10); (days[d] = days[d] || []).push(r); });
+  const label = { '暫分':'已記下', '已拆解':'已整理', '手動':'手動更新', '失敗':'整理失敗・會再試', '未拆解':'已記下', '未送出':'未送出' };
+  return `<section class="band page"><div class="wrap"><div class="cl-head">${ransom('時間軸','',S.anim)}${B(`學到的規則${(S.learned || []).length ? ' ' + S.learned.length : ''}`,'ghost sm','data-learned')}</div><p class="lead">上面是你寫的原文，下面是拆出來的段落。點一則可以刪除；要改某一段，到「今日」點那一段。</p>
+    ${Object.entries(days).map(([d,rs])=>`<div class="tl-day">${+d.slice(5,7)} 月 ${+d.slice(8)} 日${d===S.today?'・今天':''}</div>${rs.map(r=>`<article class="rec" data-menu tabindex="0" role="button" aria-expanded="false" aria-label="${esc(r.time.slice(11))} ${esc(r.raw)}，點開操作">
+      <div class="rec-h">${tstamp(r.time.slice(11))}<span class="rec-state">${label[r.state] || esc(r.state)}</span></div>
+      <p class="rec-raw">${esc(r.raw)}</p>
+      ${r.segs.map(([cat,cid,t])=>`<div class="rec-seg"><span class="cat-tag">${esc(cat)}</span><span>${(c => plate(c) + esc(bare(t, c)))(client(cid) || textClient(t))}</span></div>`).join('')}
+      <span class="menu" role="group" aria-label="操作"><button class="del" data-delrec="${esc(r.id)}" data-label="刪除這則紀錄">刪除這則紀錄</button></span>
+    </article>`).join('')}`).join('') || '<p class="lead">這週還沒有紀錄</p>'}</div></section>`;
+}
+/* ---------- 客戶 ----------
+   列表＝客戶檔案卡：名稱大字＋簡稱牌、進行中／等待中／結案三個數字、最後一次往來的日期與內容；有缺件的掛黃標。
+   依最後往來排（最近的在前），上面可以搜尋、篩選「有案件在跑／還沒有案件」、新增客戶。 */
+const mdw = ds => { const [y, m, d] = ds.split('-').map(Number); return `${m}/${d}（${'日一二三四五六'[new Date(y, m - 1, d).getDay()]}）`; };
+function clientStats(c){
+  const ks = S.cases.filter(k => k.client===c.id), its = S.items.filter(i => i.client===c.id);
+  const last = its.slice().sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time))[0];
+  return { ks, its, last, open: ks.filter(k => k.status==='進行中').length, wait: ks.filter(k => k.status==='等待中').length,
+    done: ks.filter(k => k.status==='已結案').length, lock: ks.some(k => k.status!=='已結案' && /缺件/.test(k.progress)) };
+}
+function renderClients(){
+  if (S.clientId && client(S.clientId)) return renderClient(client(S.clientId));
+  const q = S.q.trim(), f = S.cf || 'all';
+  const rows = S.clients.map(c => ({ c, s: clientStats(c) }))
+    .filter(({ c }) => !q || c.name.includes(q) || c.alias.some(a => a.includes(q)) || String(c.phone).includes(q) || String(c.contact || '').includes(q))
+    .filter(({ s }) => f==='all' || (f==='live' ? s.open + s.wait > 0 : s.ks.length===0))
+    .sort((a, b) => ((b.s.last ? b.s.last.date + b.s.last.time : '') || '').localeCompare((a.s.last ? a.s.last.date + a.s.last.time : '') || '') || a.c.name.localeCompare(b.c.name));
+  const chip = (v, l) => `<button data-cf="${v}" aria-pressed="${f===v}"><span>${l}</span></button>`;
+  /* 一位客戶一行：名稱＋簡稱、只顯示不是 0 的狀態、最後往來日期、最近一句（一行，進度紀錄改成階段小標） */
+  const lastLine = (h, cl) => { const pp = progParts(h.text), note = bare(pp.note, cl); return esc(pp.step ? pp.step + (pp.note ? '：' + note : '') : note); };
+  const row = ({ c, s }) => `<button class="cr${s.lock?' lock':''}" data-client="${c.id}" aria-label="${esc(c.name)}${s.open?`，進行中 ${s.open} 件`:''}${s.wait?`，等待中 ${s.wait} 件`:''}">
+      <span class="cr-name"><b>${esc(c.name)}</b>${c.alias.map(a => `<i>${esc(a)}</i>`).join('')}</span>
+      <span class="cr-st">${s.lock ? '<em class="lk">缺件</em>' : ''}${s.open ? `<em class="on">進行中 ${s.open}</em>` : ''}${s.wait ? `<em>等待中 ${s.wait}</em>` : ''}${s.done ? `<em class="dn">結案 ${s.done}</em>` : ''}</span>
+      <span class="cr-last">${s.last ? lastLine(s.last, c) : '還沒有往來紀錄'}</span>
+      <span class="cr-date">${s.last ? esc(s.last.date===S.today ? '今天' : s.last.date.slice(5).replace('-', '/').replace(/^0/, '')) : ''}</span>
+    </button>`;
+  const live = rows.filter(r => r.s.open + r.s.wait > 0), other = rows.filter(r => r.s.open + r.s.wait === 0);
+  const group = (h, list) => list.length ? `<div class="cr-g"><h3 class="cr-h">${h}<span>${list.length}</span></h3>${list.map(row).join('')}</div>` : '';
+  return `<section class="band page cl-page"><div class="wrap">
+    <div class="cl-head">${ransom('客戶','',S.anim)}<span class="cl-count"><b>${S.clients.length}</b>位客戶</span></div>
+    <div class="cl-tools"><div class="search"><label for="q" class="sr">搜尋客戶</label><input id="q" type="search" placeholder="名稱、簡稱、電話、窗口" value="${esc(S.q)}"></div>${B('＋ 新增客戶','','data-newclient')}</div>
+    <div class="frow cl-filter" role="group" aria-label="篩選">${chip('all','全部')}${chip('live','有案件在跑')}${chip('none','還沒有案件')}</div>
+    ${rows.length ? `<div class="cr-list">${group('有案件在跑', live)}${group(f==='live' ? '' : '其他客戶', other)}</div>`
+      : `<p class="lead">${S.clients.length ? '找不到符合的客戶' : '還沒有客戶。按「＋ 新增客戶」，或記錄裡出現新的客戶名稱時，會先到「待確認」讓你建立。'}</p>`}
+  </div></section>`;
+}
+/* 單一客戶＝檔案頁：左邊資料卡（簡稱大字、正式名稱、簡稱牌、電話可撥可複製、窗口、統編、備註、三個數字），
+   右邊這位客戶的案件（含已結案）與往來紀錄（依日期分組的時間軸）。手機改成上下排。 */
+function renderClient(c){
+  const s = clientStats(c), cases = s.ks.slice().sort((a, b) => urgency(a) - urgency(b) || daysSince(b.updated) - daysSince(a.updated));
+  /* 往來時間軸：這位客戶的紀錄、整理進來的檔案、案件的行程、待辦，照時間排成一條（新的在上；還沒到的行程排最上面，標「接下來」） */
+  const kids = new Set(s.ks.map(k => k.id)), md = ds => String(ds || '').slice(5).replace('-', '/').replace(/^0/, '');
+  const allEnt = [
+    ...s.its.map(h => ({ date: h.date, time: h.time, kind: '紀錄', tag: h.cat, html: h.prog ? progHTML(h, c) : esc(bare(h.text, c)) })),
+    ...(S.files || []).filter(f => f.client === c.id).map(f => ({ date: f.date || String(f.at || '').slice(0, 10), time: String(f.at || '').slice(11, 16), kind: '檔案', tag: '檔案',
+      html: `<button class="tl-file" type="button" data-file="${esc(f.id)}">${thumbHTML(f.id, 'rf-th')}<span>${esc(f.type)}・${esc(f.name)}</span></button>` })),
+    ...(S.events || []).filter(e => kids.has(e.case)).map(e => ({ date: e.date, time: e.t || '', kind: '行程', tag: '行程', html: esc(e.d) + (e.end && e.end !== e.date ? `<span class="tl-note">到 ${md(e.end)}</span>` : '') })),
+    ...(S.todos || []).filter(t => t.client === c.id).map(t => ({ date: String(t.created || '').slice(0, 10), time: String(t.created || '').slice(11, 16), kind: '待辦', tag: '待辦',
+      html: esc(t.text) + (t.done ? '<span class="tl-note">完成</span>' : t.due ? `<span class="tl-note">期限 ${md(t.due)}</span>` : '') })),
+  ].filter(x => x.date).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  const tlk = S.tlk || '全部', hist = tlk === '全部' ? allEnt : allEnt.filter(x => x.kind === tlk), shown = S.histAll ? hist : hist.slice(0, 30);
+  const kinds = ['全部', '紀錄', '檔案', '行程', '待辦'].filter(k => k === '全部' || allEnt.some(x => x.kind === k));
+  const tel = String(c.phone || '').replace(/[^0-9+]/g, '');
+  const field = (label, v, extra = '') => `<div class="cd-f"><dt>${label}</dt><dd>${v ? v + extra : '<span class="cd-empty">未填</span>'}</dd></div>`;
+  let day = '', tl = '';
+  shown.forEach(h => { if (h.date !== day) { day = h.date; tl += `<div class="cd-day">${esc(day > S.today ? '接下來・' + mdw(day) : day===S.today ? '今天・' + mdw(day) : mdw(day))}</div>`; }
+    tl += `<div class="cd-h${h.kind === '紀錄' ? '' : ' k-' + (h.kind === '檔案' ? 'file' : h.kind === '行程' ? 'ev' : 'todo')}"><span class="cd-t">${esc(h.time)}</span><span class="cat-tag">${esc(h.tag)}</span><p>${h.html}</p></div>`; });
+  return `<section class="band page cd-page"><div class="wrap">
+    <button class="back" data-back>← 客戶列表</button>
+    <div class="cd-grid">
+      <aside class="cd-card">
+        <h2 class="cd-nm">${esc(nick(c))}</h2>
+        <p class="cd-full">${esc(c.name)}</p>
+        ${c.alias.length ? `<p class="cc-alias">${c.alias.map(a => `<i>${esc(a)}</i>`).join('')}</p>` : ''}
+        <div class="cd-stats"><span><b>${s.open}</b>進行中</span><span><b>${s.wait}</b>等待中</span><span><b>${s.done}</b>結案</span><span><b>${s.its.length}</b>往來</span></div>
+        <dl class="cd-info">
+          ${field('電話', c.phone ? `<a class="t" href="tel:${esc(tel)}">${esc(c.phone)}</a>` : '', c.phone ? B('複製','ghost sm',`data-copy="${esc(c.phone)}"`) : '')}
+          ${field('窗口', esc(c.contact || ''))}${field('統編', c.tax ? `<span class="t">${esc(c.tax)}</span>` : '')}
+          ${field('地址', esc(c.addr || ''))}${field('發票抬頭', esc(c.title || ''))}${field('Email', c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}${field('備註', esc(c.note || ''))}
+        </dl>
+        <div class="cd-acts">${B('修改資料','ghost sm',`data-editclient="${c.id}"`)}${B('＋ 開新案件','sm','data-opencase')}</div>
+      </aside>
+      <div class="cd-main">
+        <section class="cd-sec"><h3 class="cd-h3">案件<span>${cases.length} 件</span></h3>
+          ${cases.length ? `<div class="quests">${cases.map(questHTML).join('')}</div>` : '<p class="cd-none">這位客戶還沒有案件</p>'}</section>
+        ${(() => { const ps = (S.projects || []).filter(p => p.client === c.id).sort(pjSort);
+          return ps.length ? `<section class="cd-sec"><h3 class="cd-h3">專案<span>${ps.length} 件</span></h3><div class="quests">${ps.map(projectRow).join('')}</div></section>` : ''; })()}
+        ${(() => { const fs = (S.files || []).filter(x => x.client === c.id);
+          return fs.length ? `<section class="cd-sec"><h3 class="cd-h3">檔案<span>${fs.length} 個</span></h3>${filesHTML(fs, '')}</section>` : ''; })()}
+        <section class="cd-sec"><h3 class="cd-h3">往來時間軸<span>${hist.length} 筆${s.last ? '・最後往來 ' + esc(s.last.date===S.today ? '今天' : mdw(s.last.date)) : ''}</span></h3>
+          ${kinds.length > 2 ? `<div class="frow tl-kinds" role="group" aria-label="篩選時間軸">${kinds.map(k => `<button data-tlk="${k}" aria-pressed="${tlk===k}"><span>${k}</span></button>`).join('')}</div>` : ''}
+          ${tl ? `<div class="cd-tl">${tl}</div>` : '<p class="cd-none">還沒有往來紀錄</p>'}
+          ${hist.length > 30 ? `<button class="c-more" data-histall>${S.histAll ? '收起' : '顯示其餘 ' + (hist.length - 30) + ' 筆'}</button>` : ''}</section>
+      </div>
+    </div>
+  </div></section>`;
+}
+function renderCases(){
+  const opts = {status:['全部','進行中','等待中','已結案'], action:['全部',...S.actions], product:['全部',...S.products]};
+  const names = {status:'狀態',action:'動作',product:'產品'};
+  const list = S.cases.filter(k => Object.keys(S.f).every(f => S.f[f]==='全部' || k[f]===S.f[f]));
+  return `<section class="band page"><div class="wrap"><div class="cl-head">${ransom('案件','',S.anim)}${B('申請書庫','ghost sm','data-fmlib')}</div><p class="lead">點案件就能更新進度；超過 14 天沒進度的會貼紅色警示條</p>
+    <div class="filters">${Object.keys(opts).map(f=>`<div class="frow" role="group" aria-label="${names[f]}"><span>${names[f]}</span>${opts[f].map(o=>`<button aria-pressed="${S.f[f]===o}" data-f="${f}" data-v="${esc(o)}"><span>${esc(o)}</span></button>`).join('')}</div>`).join('')}</div></div></section>
+    <section class="band b-band cases-band"><div class="wrap"><div class="sec-h">${ransom(`共${list.length}件`,'md',S.anim)}</div><div class="panels">${list.map(panelHTML).join('') || '<p class="aside">沒有符合的案件</p>'}</div></div></section>`;
+}
+
+const NAV = [['home','今日'],['timeline','時間軸'],['clients','客戶'],['cases','案件'],['projects','專案']];
+/* 電腦版（寬度 1100 以上）：左邊直式選單、右邊固定欄；多一個「週報」直接進去 */
+const DESK_MQ = matchMedia('(min-width:1100px)');
+const DESK = () => DESK_MQ.matches;
+DESK_MQ.addEventListener?.('change', () => render());
+const navItems = () => DESK() ? [NAV[0], ['week','週報'], ...NAV.slice(1)] : NAV;
+const navCurrent = id => id==='week' ? S.view==='home' && S.homeTab==='week'
+  : id==='home' ? S.view==='home' && !(DESK() && S.homeTab==='week') : S.view===id;
+function render(pageChange){
+  if (!S.ready) return;
+  const v = document.getElementById('view');
+  const draft = document.getElementById('cap')?.value || '';
+  // 報價試算還沒存檔時重畫（例如別的操作的伺服器回應回來了），先記下正在填的內容，畫完再填回去
+  const qEl = document.getElementById('quote'); if (qEl && S.view === 'projects' && S.projectId === qEl.dataset.quote) S.qDraft = Object.assign({ id: qEl.dataset.quote }, quoteRead());
+  const todoDraft = document.getElementById('todoIn')?.value || '', todoFocus = document.activeElement?.id === 'todoIn';
+  v.innerHTML = {home:renderHome, timeline:renderTimeline, clients:renderClients, cases:renderCases, projects:renderProjects}[S.view]();
+  const cap = document.getElementById('cap'); if (cap && draft && !S.clearDraft) cap.value = draft; S.clearDraft = false; mirrorPrev = ''; syncMirror(false, true);
+  const tIn = document.getElementById('todoIn'); if (tIn && todoDraft) tIn.value = todoDraft; if (tIn && todoFocus) tIn.focus({ preventScroll: true });
+  const qNew = document.getElementById('quote');
+  if (qNew && S.qDraft && S.qDraft.id === qNew.dataset.quote) {
+    document.getElementById('qVendor').value = S.qDraft.vendor; document.getElementById('qMarkup').value = S.qDraft.markup;
+    document.getElementById('qBody').innerHTML = (S.qDraft.items.length ? S.qDraft.items : [{ n: '', q: 1, u: '', c: '' }]).map(quoteRow).join('');
+  }
+  quoteRecalc();
+  v.className = pageChange ? 'view-in' : '';
+  document.getElementById('nav').innerHTML = (DESK() ? `<div class="side-brand" title="工作日誌 v${esc(window.WORKLOG_VERSION||'')}">${document.getElementById('logoTpl').innerHTML}</div>` : '')
+    + navItems().map(([id,l])=>`<button data-nav="${id}" ${navCurrent(id)?'aria-current="page"':''}><span>${l}</span></button>`).join('');
+  const railBody = document.getElementById('railBody'); if (railBody) railBody.innerHTML = DESK() ? railHTML() : '';
+  syncCity();
+  hydrateThumbs();
+  S.items.forEach(i => delete i.fresh); S.flash=[]; S.bump=[]; S.adv=null; S.justClosed=null; S.anim=false; S.animDelay=0;
+}
+
+/* 導覽換頁：舊頁往下沉、霧被撥一下、新頁從霧裡浮上來（約 0.4 秒；減少動態時直接換） */
+let navBusy = false;
+function navTo(view, btn){
+  const go = () => { if (view==='week') { S.view='home'; S.homeTab='week'; } else { S.view = view; if (view==='home') S.homeTab='today'; } S.clientId = null; S.projectId = null; S.qDraft = null; S.anim = true; render(true); scrollTo(0,0); };
+  if (navBusy) return;
+  if (navCurrent(view) && !S.clientId && !S.projectId) return;
+  if (btn && window.Fog) { const r = btn.getBoundingClientRect(); Fog.stir(r.left + r.width / 2, r.top + r.height / 2, 1); }
+  const v = document.getElementById('view');
+  if (document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) { go(); return; }
+  navBusy = true; v.classList.add('view-out');
+  setTimeout(() => { v.classList.remove('view-out'); go(); navBusy = false; }, 180);
+}
+function sheet(html){
+  const o = document.getElementById('overlay');
+  const m = /^\s*<h3>([\s\S]*?)<\/h3>/.exec(html), title = m ? m[1] : '', body = m ? html.slice(m[0].length) : html;
+  o.innerHTML = `<div class="scrim" data-close><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <h3 class="sheet-plate" id="sheetTitle">${title}</h3><div class="sheet-in">${body}</div></div></div>`;
+  o.querySelector('.sheet textarea, .sheet input, .sheet button')?.focus({ preventScroll: true });
+  hydrateThumbs();
+}
+const closeSheet = () => { document.getElementById('overlay').innerHTML = ''; S.sheetCase = null; S.fpOpen = false; if (City.on) City.setFocus(null); };
+
+/* 案件進度：寫一句這次的進度（自由寫），要換階段再點一個；兩者至少一個。下面列出這個案件所有的進度紀錄 */
+function progSheet(k, keep={}){
+  const c = client(k.client);
+  S.pstep = keep.pick || ''; S.sheetCase = k.id;
+  const hist = S.items.filter(i => i.case===k.id).slice().sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+  if (City.on) City.setFocus(k.id);
+  sheet(`<h3>${esc(nick(c))}・${esc(k.action)}・${esc(k.product)}</h3>
+    <div class="sheet-head"><p>目前<b>${esc(k.progress)}</b><span>${esc(k.status)}</span></p>
+      <div class="sheet-tools">${B('修改案件','ghost sm',`data-editcase="${k.id}"`)}${B('轉成專案','ghost sm',`data-toproj="${k.id}"`)}${c?B('客戶資料','ghost sm',`data-client="${c.id}"`):''}</div></div>
+    ${(S.forms || []).length ? `<div class="pf-forms"><h4>申請書<span>${(k.forms || []).length ? (k.forms || []).length + ' 份' : '還沒選'}</span></h4>${formChips(k.forms)}${B((k.forms || []).length ? '改申請書' : '選申請書', 'ghost sm', `data-fmforms="${k.id}"`)}</div>` : ''}
+    <label for="pnote">這次的進度</label><textarea id="pnote" rows="2">${esc(keep.note||'')}</textarea>
+    <h4>換階段（選填）</h4>
+    ${stageBoard(k.progress, S.pstep)}
+    <details class="addstep"><summary>＋ 新增階段</summary><div class="row"><input id="newstep" aria-label="新的階段名稱" autocomplete="off">${B('加入','sm',`data-addstep="${k.id}"`)}</div>
+      <p class="hint">加入後，所有案件都能選</p></details>
+    <div class="sheet-foot">${B('記下進度','',`data-apply="${k.id}"`)}${B('關閉','ghost sm','data-close')}</div>
+    ${hist.length?`<h4>進度紀錄</h4><ul class="plog">${hist.map(h=>`<li data-menu tabindex="0" role="button" aria-expanded="false" aria-label="${esc(h.text)}，點開操作">${tstamp(h.date.slice(5).replace('-','/')+' '+h.time)}<span>${progHTML(h, c)}</span>${itemActs(h)}</li>`).join('')}</ul>`:''}`);
+}
+/* 今天的簡報：每天第一次打開跳出還沒結案的案件（一天一次，記在這台裝置），最急的排最前面；點一列直接打開那件的進度 */
+const BRIEF_KEY = 'worklog-brief';
+function showBrief(force){
+  if (!S.ready) return;
+  const day = stamp(new Date()).slice(0, 10);
+  if (!force && store.get(BRIEF_KEY) === day) return;
+  const open = S.cases.filter(k => k.status !== '已結案');
+  if (!open.length && !force) return;
+  store.set(BRIEF_KEY, day);
+  const old = k => daysSince(k.updated) > 14, lack = k => /缺件/.test(k.progress);
+  const byAge = (a, b) => daysSince(b.updated) - daysSince(a.updated);
+  const groups = [
+    ['超過 14 天沒動', 'hot', open.filter(old)],
+    ['缺件中', 'warn', open.filter(k => !old(k) && lack(k))],
+    ['要你推進', '', open.filter(k => !old(k) && !lack(k) && k.status === '進行中')],
+    ['等回覆', 'soft', open.filter(k => !old(k) && !lack(k) && k.status === '等待中')],
+  ].map(([t, cls, list]) => [t, cls, list.sort(byAge)]);
+  const row = (k, cls) => { const c = client(k.client), d = daysSince(k.updated);
+    return `<button class="brief-row ${cls}" data-prog="${k.id}"><span class="b-who">${plate(c)}<small>${esc(k.action)}・${esc(k.product)}</small></span>
+      <span class="b-step">${esc(shortStep(k.progress))}</span><span class="b-age">${d === 0 ? '<em>今天</em>' : `<b>${d}</b>天`}</span></button>`; };
+  const [n] = [new Date()], wd = '日一二三四五六'[n.getDay()];
+  const todaySch = S.sched.filter(x => x.day === '今天');
+  if (DESK()) { briefStage(groups.flatMap(g => g[2]), todaySch); return; }
+  sheet(`<h3>今天的簡報・${n.getMonth() + 1}/${n.getDate()}（${wd}）</h3>
+    <div class="brief-sum">${groups.slice(0, 2).concat([groups[3]]).map(([t, cls, l]) => `<span class="${cls}"><b>${l.length}</b>${t.replace(" 沒動", "")}</span>`).join('')}</div>
+    ${open.length ? groups.filter(g => g[2].length).map(([t, cls, l]) => `<h4>${t}<span>${l.length} 件</span></h4>${l.map(k => row(k, cls)).join('')}`).join('')
+      : '<p>沒有未結案的案件。</p>'}
+    ${todaySch.length ? `<h4>今天的行程</h4>${todaySch.map(x => `<div class="brief-sch">${tstamp(x.t)}<span>${esc(x.d)}</span></div>`).join('')}` : ''}
+    <div class="sheet-foot">${B('開始今天','','data-close')}</div>`);
+}
+
+/* 電腦版開場：最急的五件用案件列列出（點一件直接開進度），其餘幾件、今天的行程，按「開始今天」收掉 */
+function briefStage(list, todaySch){
+  const h = new Date().getHours(), hi = h < 11 ? '早安。' : h < 18 ? '午安。' : '晚安。';
+  const o = document.getElementById('overlay');
+  o.innerHTML = `<div class="stage-brief" data-close role="dialog" aria-modal="true" aria-labelledby="sbTitle"><div class="sb-panel">
+    <div class="sb-top"><b id="sbTitle">${hi}</b><span>今天要追的案件<br>還有 ${list.length} 件</span></div>
+    <div class="sb-list">${list.slice(0, 5).map(questHTML).join('') || '<p class="sb-more">沒有未結案的案件</p>'}</div>
+    ${list.length > 5 ? `<p class="sb-more">其餘 ${list.length - 5} 件在右欄與「案件」頁</p>` : ''}
+    ${todaySch.map(x => `<div class="sb-sch">${tstamp(x.t)}<span>${esc(x.d)}</span></div>`).join('')}
+    <div class="sb-go"><button class="btn go" data-close><span>開始今天</span></button></div></div></div>`;
+  o.querySelector('.go').focus({ preventScroll: true });
+}
+
+/* 從一句話猜客戶名稱、動作、產品，確認畫面先幫忙選好（使用者可以改） */
+const guessName = t => { const m = String(t).match(/「([^」]{2,20})」/) || String(t).match(/^(\S{2,12})\s+\S/); return m ? m[1] : ''; };
+const guessAction = t => { const a = /續約/.test(t) ? '續約' : /退租|解約|拆機/.test(t) ? '退租' : /新申辦|新辦|新租|新組|申辦|新裝|新申請/.test(t) ? '新租' : ''; return S.actions.includes(a) ? a : ''; };
+const guessProduct = t => S.products.find(p => p !== '其他' && t.includes(p))
+  || [['行動',/門號|手機|行動/],['光世代',/光世代|光纖|寬頻/],['市話',/市話|電話線/],['SIM 卡',/SIM/i]].find(([p, re]) => S.products.includes(p) && re.test(t))?.[0] || '';
+
+/* 歸到案件／開新案件／確認業務。it 是 null 時從業務欄直接開；confirm＝剛分到業務，順手確認。
+   紀錄沒有客戶時要填客戶（打字時列出相符的既有客戶，沒有就建新的） */
+function caseSheet(it, confirm=false){
+  const c = it ? client(it.client) : null, open = c ? S.cases.filter(k=>k.client===c.id && k.status!=='已結案') : [];
+  const t = it ? it.text : '';
+  S.ncItem = it; S.pstep = '';
+  S.nc = { a: guessAction(t) || null, p: guessProduct(t) || null };
+  const title = !it ? '開新案件' : confirm ? '確認這件業務' : it.cat==='諮詢' ? '轉成業務案件' : '歸到哪個案件？';
+  sheet(`<h3>${title}</h3>${it?`<p>${c?esc(nick(c))+'：':''}${esc(bare(t, c))}</p>`:''}
+    ${open.length?`<h4>${esc(nick(c))} 進行中的案件</h4><div class="acts">${open.map(k=>B(`${esc(k.action)}・${esc(k.product)}（${esc(shortStep(k.progress))}）`,'sm',`data-link="${k.id}"`)).join('')}</div><h4>或開新案件</h4>`:''}
+    ${c?'':`<label for="ncClient">客戶</label><input id="ncClient" autocomplete="off" value="${esc(guessName(t))}"><div class="pick sug" id="ncSug"></div>`}
+    ${pickRow('a')}
+    ${pickRow('p')}
+    <h4>目前階段（選填）</h4>
+    ${stageBoard('', '')}
+    <label for="ncNote">補一句（選填）</label><input id="ncNote" autocomplete="off">
+    <div class="sheet-foot">${B('建立案件','','data-newcase')}${B(confirm?'先不要':'取消','ghost sm','data-close')}</div>`);
+  renderSug();
+}
+/* 剛分到業務的紀錄一筆一筆跳出確認 */
+function nextConfirm(){
+  while (S.confirmQ.length) {
+    const it = live(S.confirmQ.shift());
+    if (S.items.includes(it) && it.cat==='業務' && !it.case) { caseSheet(it, true); return; }
+  }
+}
+
+/* 修改案件：客戶、動作、產品；刪除要按兩次 */
+function caseEditSheet(k){
+  const c = client(k.client);
+  S.nc = { a: k.action, p: k.product };
+  sheet(`<h3>修改案件</h3>
+    <label for="ncClient">客戶</label><input id="ncClient" autocomplete="off" value="${esc(c ? c.name : '')}"><div class="pick sug" id="ncSug"></div>
+    ${pickRow('a')}
+    ${pickRow('p')}
+    <div class="sheet-foot">${B('存檔','',`data-savecase="${k.id}"`)}${B('取消','ghost sm','data-close')}<button class="danger" data-delcase="${k.id}">刪除案件</button></div>`);
+  renderSug();
+}
+/* 修改客戶資料 */
+// 統編欄：旁邊一顆「用名稱查」（公司統編查詢，資料服務的 company_byName）；離開欄位時檢查統編是哪一家
+const taxField = v => `<label for="cfTax">統編</label><div class="co-row"><input id="cfTax" inputmode="numeric" autocomplete="off" value="${esc(v||'')}">${B('用名稱查','ghost sm','data-cofind')}</div>
+  <p class="hint co-note" id="coNote" aria-live="polite"></p><div class="co-list" id="coList"></div>`;
+function clientSheet(c){
+  const f = (id, label, v, type='text') => `<label for="${id}">${label}</label><input id="${id}" type="${type}" autocomplete="off" value="${esc(v||'')}">`;
+  S.coCands = null;
+  if (!c) {
+    sheet(`<h3>新增客戶</h3>
+      ${f('cfName','正式名稱（必填）','')}${f('cfAlias','簡稱（多個用、隔開）','')}${f('cfPhone','電話','','tel')}
+      ${f('cfContact','窗口','')}${taxField('')}${f('cfAddr','地址','')}${f('cfTitle','發票抬頭（跟正式名稱不同時才填）','')}${f('cfEmail','Email','','email')}${f('cfNote','備註','')}
+      <p class="hint">建好之後，以前紀錄裡提到這個名稱或簡稱的，會自動接到這位客戶</p>
+      <div class="sheet-foot">${B('建立客戶','','data-addclient')}${B('取消','ghost sm','data-close')}</div>`);
+    return;
+  }
+  const n = S.cases.filter(k => k.client===c.id).length;
+  sheet(`<h3>修改客戶資料</h3>
+    ${f('cfName','正式名稱',c.name)}${f('cfAlias','簡稱（多個用、隔開）',c.alias.join('、'))}${f('cfPhone','電話',c.phone,'tel')}
+    ${f('cfContact','窗口',c.contact)}${taxField(c.tax)}${f('cfAddr','地址',c.addr)}${f('cfTitle','發票抬頭（跟正式名稱不同時才填）',c.title)}${f('cfEmail','Email',c.email,'email')}${f('cfNote','備註',c.note)}
+    <div class="sheet-foot">${B('存檔','',`data-saveclient="${c.id}"`)}${B('取消','ghost sm','data-close')}${n?'':`<button class="danger" data-delclient="${c.id}">刪除客戶</button>`}</div>
+    ${n?`<p class="hint">這位客戶有 ${n} 件案件，要刪除客戶請先刪掉案件</p>`:''}`);
+}
+/* 公司統編查詢：用正式名稱（沒填就用第一個簡稱）找候選，點一家就填入統編；地址、發票抬頭只補空的，不蓋掉你填過的 */
+const coErr = e => { const m = String(e && e.message || e); return /未知的功能/.test(m) ? '目前接的資料服務還沒有這個功能' : '查不到：' + m.replace(/^[A-Z]+:/, ''); };
+async function coFind(){
+  const $ = id => document.getElementById(id);
+  const name = ($('cfName').value.trim() || $('cfAlias').value.split(/[、,，\s]+/).filter(Boolean)[0] || '').trim();
+  const note = $('coNote'), list = $('coList');
+  if (!name) { note.textContent = '先填正式名稱或簡稱，再按「用名稱查」'; $('cfName').focus(); return; }
+  note.textContent = `查「${name}」中…`; list.innerHTML = '';
+  try {
+    const r = await call('company_byName', name, 5);
+    if (!document.getElementById('coList')) return;   // 查的時候已經關掉了
+    if (r.status !== 'ok') { note.textContent = r.status === 'vague' ? '名稱太籠統，多打幾個字試試' : `找不到「${name}」：只收公司，不含行號、工作室，也查不到已歇業的`; return; }
+    S.coCands = r.candidates;
+    note.textContent = r.confident ? '點一下就填入統編' : '有幾家很像，確認是哪一家再點';
+    list.innerHTML = r.candidates.map((c, i) => `<button type="button" class="co-item" data-copick="${i}"><b>${esc(c.name)}</b><span><i>${esc(c.id)}</i>${c.address ? '・' + esc(c.address) : ''}</span></button>`).join('');
+  } catch (e) { note.textContent = coErr(e); }
+}
+function coPick(i){
+  const $ = id => document.getElementById(id), c = S.coCands && S.coCands[i];
+  if (!c || !$('cfTax')) return;
+  $('cfTax').value = c.id;
+  const filled = ['統編'];
+  if (c.address && !$('cfAddr').value.trim()) { $('cfAddr').value = c.address; filled.push('地址'); }
+  const nm = $('cfName').value.trim();
+  if (!nm) { $('cfName').value = c.name; filled.push('正式名稱'); }
+  else if (nm !== c.name && !$('cfTitle').value.trim()) { $('cfTitle').value = c.name; filled.push('發票抬頭'); }
+  $('coList').innerHTML = '';
+  $('coNote').textContent = `已填入${filled.join('、')}（${c.name}），記得按存檔`;
+}
+async function coCheck(){
+  const inp = document.getElementById('cfTax'), note = document.getElementById('coNote');
+  const v = inp && inp.value.trim();
+  if (!v || !note) return;
+  try {
+    const r = await call('company_byId', v);
+    if (document.getElementById('cfTax') !== inp || inp.value.trim() !== v) return;   // 已經改了或關掉了
+    note.textContent = r.status === 'ok' ? `✓ ${r.company.name}` : r.message;
+  } catch (e) { note.textContent = coErr(e); }
+}
+// 統編改過、離開欄位時檢查一次（打錯一碼、或其實是別家公司，當場就知道）
+document.addEventListener('change', e => { if (e.target && e.target.id === 'cfTax') coCheck(); });
+
+/* 動作／產品選項，最後一個是「＋ 新增」：展開一個輸入框，加入後寫進試算表的設定分頁 */
+const OPT = { a: { label: '動作', type: '動作', list: () => S.actions }, p: { label: '產品', type: '產品', list: () => S.products } };
+function pickRow(kind){
+  const o = OPT[kind], sel = S.nc[kind];
+  return `<h4>${o.label}</h4><div class="pick" role="group" aria-label="${o.label}" id="pick-${kind}">${o.list().map(v=>`<button aria-pressed="${sel===v}" data-n${kind}="${esc(v)}"><span>${esc(v)}</span></button>`).join('')}<button class="add-opt" aria-expanded="false" data-addopt="${kind}"><span>＋ 新增</span></button></div>
+    <div class="opt-new" id="optNew-${kind}" hidden><input id="optIn-${kind}" aria-label="新的${o.label}名稱" autocomplete="off">${B('加入','sm',`data-optsave="${kind}"`)}</div>`;
+}
+function renderSug(){
+  const inp = document.getElementById('ncClient'), box = document.getElementById('ncSug'); if (!inp || !box) return;
+  const q = inp.value.trim();
+  const hit = S.clients.filter(c => !q || c.name.includes(q) || c.alias.some(a => a.includes(q))).slice(0, 6);
+  const known = S.clients.some(c => c.name === q || c.alias.includes(q));
+  box.innerHTML = hit.map(c=>`<button type="button" aria-pressed="${c.name===q}" data-ncc="${esc(c.name)}"><span>${esc(c.name)}</span></button>`).join('')
+    + (q && !known ? `<span class="sug-new">會建立新客戶「${esc(q)}」</span>` : '');
+}
+
+/* ---------- 待辦 ----------
+   今日頁最上面的勾選清單：業務以外要記得做的事。沒做完的照「過期→今天→有期限→沒期限」排；做完的淡掉，留到隔天。 */
+const dueLabel = d => { if (!d) return ''; const n = -daysSince(d); return n < 0 ? `過期 ${-n} 天` : n === 0 ? '今天' : n === 1 ? '明天' : `${+d.slice(5,7)}/${+d.slice(8)}`; };
+function todoSorted(){
+  const all = S.todos || [];
+  const open = all.filter(t => !t.done).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999') || String(a.created).localeCompare(String(b.created)));
+  const done = all.filter(t => t.done).sort((a, b) => String(b.done).localeCompare(String(a.done)));
+  return { open, done };
+}
+function todoRow(t){
+  const late = t.due && !t.done && t.due < S.today;
+  return `<div class="td-row${t.done ? ' done' : ''}">
+    <button class="td-chk" data-todo="${t.id}" aria-pressed="${!!t.done}" aria-label="${t.done ? '取消勾選' : '勾選完成'}：${esc(t.text)}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.4 8.5 6.6 11.4 12.6 4.8"/></svg></button>
+    <button class="td-x" data-todoedit="${t.id}">${esc(t.text)}</button>
+    ${t.due ? `<span class="td-due${late ? ' late' : ''}${t.due === S.today && !t.done ? ' now' : ''}">${dueLabel(t.due)}</span>` : ''}
+  </div>`;
+}
+/* compact：手機只先列 3 件，其餘收起來 */
+function todoHTML(compact){
+  const { open, done } = todoSorted(), all = !compact || S.todoAll;
+  const show = all ? open : open.slice(0, 3);
+  return `<section class="td" aria-label="待辦">
+    <h3 class="td-h">待辦<span>${open.length ? open.length + ' 件沒做完' : '都做完了'}</span></h3>
+    ${show.length || done.length ? `<div class="td-list">${show.map(todoRow).join('')}${all ? done.map(todoRow).join('') : ''}</div>` : ''}
+    ${compact && (open.length > 3 || done.length) ? `<button class="c-more" data-todoall>${S.todoAll ? '收起' : open.length > 3 ? '還有 ' + (open.length - 3) + ' 件' : '看做完的'}</button>` : ''}
+    <form class="td-add" id="todoForm"><label for="todoIn" class="sr">新的待辦</label><input id="todoIn" autocomplete="off" enterkeyhint="done">
+      <label for="todoDue" class="sr">期限（選填）</label><input id="todoDue" type="date"><button class="btn sm" type="submit"><span>加一件</span></button></form>
+  </section>`;
+}
+function todoSheet(t){
+  sheet(`<h3>待辦</h3><label for="tdText">內容</label><textarea id="tdText" rows="2">${esc(t.text)}</textarea>
+    <label for="tdDue">期限（選填）</label><input id="tdDue" type="date" value="${esc(t.due || '')}">
+    <div class="sheet-foot">${B('存檔','',`data-todosave="${t.id}"`)}${B('取消','ghost sm','data-close')}<button class="danger" data-tododel="${t.id}">刪除</button></div>`);
+}
+
+/* ---------- 學到的規則 ----------
+   只從你手動改過的地方學（改分類、歸到案件、確認簡稱）；快記粗分與排程整理都會照著做。學錯可以刪。 */
+function learnedSheet(){
+  const L = S.learned || [], group = (type, h, fmt) => { const rows = L.filter(r => r.type === type).sort((a, b) => b.n - a.n || String(b.at).localeCompare(String(a.at)));
+    return rows.length ? `<h4>${h}<span>${rows.length} 條</span></h4><ul class="lr">${rows.map(r => `<li><span class="lr-k">${esc(r.key)}</span><span class="lr-r">${fmt(r)}</span><small>${r.n > 1 ? r.n + ' 次' : esc(r.at.slice(5).replace('-','/'))}</small><button class="danger sm" data-unlearn="${r.id}">刪除</button></li>`).join('')}</ul>` : ''; };
+  sheet(`<h3>學到的規則</h3><p class="hint">從你手動改過的地方學來的，下次整理照著做</p>
+    ${group('分類', '分類', r => '→ ' + esc(r.result))}${group('案件', '業務是哪一種', r => '→ ' + esc(r.result))}${group('簡稱', '客戶簡稱', r => '＝ ' + esc(r.result))}
+    ${L.length ? '' : '<p>還沒有學到規則。</p>'}
+    <div class="sheet-foot">${B('關閉','ghost sm','data-close')}</div>`);
+}
+
+/* ---------- 專案 ----------
+   多方協作的工程案，關卡固定（使用者的流程圖）：每關有負責的人（球在誰手上），報價、驗收單、交發票三關要準備文件。
+   列表跟案件同一種一列式（關卡名＋換你／等誰＋第幾關＋分段進度條，文件關卡的格子有紅色記號）；點進去是流程、報價試算、文件、進度紀錄。 */
+const pjSteps = () => S.projectSteps || [];
+const pjById = id => (S.projects || []).find(p => p.id === id);
+const PJ_N = () => pjSteps().length;
+const pjStepName = (p, i) => i >= PJ_N() ? '結案' : i === 8 ? (p.scale === '大案' ? '會同廠商現場驗收、用印' : '客戶確認並用印') : pjSteps()[i].name;
+const pjBall = p => p.stage >= PJ_N() ? '' : pjSteps()[p.stage].who;
+const pjBallTag = p => { const w = pjBall(p); return !w ? '<span class="who done">結案</span>' : w === '我' ? '<span class="who me">換你</span>' : `<span class="who them">等${esc(w)}</span>`; };
+const money = n => '$' + Math.round(Number(n) || 0).toLocaleString('en-US');
+function pjTrack(p){
+  return `<span class="stepper pj-track" style="--n:${PJ_N()}" role="img" aria-label="第 ${Math.min(p.stage + 1, PJ_N())} 關，共 ${PJ_N()} 關">${pjSteps().map((s, i) =>
+    `<span class="seg${i < p.stage ? ' past' : ''}${i === p.stage ? ' cur' : ''}${s.doc ? ' doc' : ''}"></span>`).join('')}</span>`;
+}
+function projectRow(p){
+  const c = client(p.client), fin = p.stage >= PJ_N(), d = daysSince(p.updated);
+  return `<button class="quest pj-row${fin ? ' fin' : ''}" data-proj="${p.id}" aria-label="${esc(c ? c.name : '')} ${esc(p.name)}，${esc(pjStepName(p, p.stage))}，點開專案">
+    <span class="q-name"><strong>${esc(c ? c.name : '未指定客戶')}</strong><span>${esc(p.name)}${p.scale === '大案' ? '・大案' : ''}</span></span>
+    <span class="q-meta"><span class="q-lab"><b>${esc(pjStepName(p, p.stage))}</b>${pjBallTag(p)}${fin ? '' : `<i>${p.stage + 1}／${PJ_N()}</i>`}</span>${pjTrack(p)}</span>
+    <span class="q-age${d > 14 && !fin ? ' hot' : ''}">${fin ? '<span>結案</span>' : `<b>${d === 0 ? '今' : d}</b><span>${d === 0 ? '天有動' : '天沒動'}</span>`}</span>
+  </button>`;
+}
+const pjSort = (a, b) => (a.stage >= PJ_N()) - (b.stage >= PJ_N()) || (pjBall(b) === '我') - (pjBall(a) === '我') || daysSince(b.updated) - daysSince(a.updated);
+function renderProjects(){
+  if (S.projectId && pjById(S.projectId)) return renderProject(pjById(S.projectId));
+  const list = (S.projects || []).slice().sort(pjSort), open = list.filter(p => p.stage < PJ_N()), done = list.filter(p => p.stage >= PJ_N());
+  return `<section class="band page"><div class="wrap">
+    <div class="cl-head">${ransom('專案','',S.anim)}${B('＋ 新專案','','data-newproj')}</div>
+    ${open.length ? `<div class="quests">${open.map(projectRow).join('')}</div>` : '<p class="lead">還沒有進行中的專案。</p>'}
+    ${done.length ? `<h3 class="cr-h pj-done-h">已結案<span>${done.length}</span></h3><div class="quests">${done.map(projectRow).join('')}</div>` : ''}
+  </div></section>`;
+}
+function renderProject(p){
+  const c = client(p.client), N = PJ_N(), fin = p.stage >= N;
+  const flow = pjSteps().map((s, i) => {
+    const st = i < p.stage ? 'past' : i === p.stage ? 'cur' : 'next';
+    return `<li class="pf ${st}${s.doc ? ' doc' : ''}"><span class="pf-who">${esc(i === 9 ? '我 → 祐芹姐' : s.who)}</span>
+      <button class="pf-box" data-pjstage="${i}" aria-label="${esc(pjStepName(p, i))}${st === 'cur' ? '（目前）' : ''}，點一下推進到這關">
+        ${st === 'cur' ? '<em>目前</em>' : ''}<b>${esc(pjStepName(p, i))}</b>${s.doc ? `<small>${esc(s.doc)}</small>` : ''}</button></li>`;
+  }).join('');
+  const hist = S.items.filter(i => i.case === p.id).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time));
+  return `<section class="band page pj-page"><div class="wrap">
+    <button class="back" data-pjback>← 專案列表</button>
+    <header class="pj-head"><div class="pj-title"><h2 class="pj-nm">${esc(p.name)}</h2>
+        <p class="pj-sub">${c ? `<button class="pj-cl" data-client="${c.id}">${esc(c.name)}</button>` : '未指定客戶'}<span>${esc(p.scale)}</span>${p.vendor ? `<span>廠商 ${esc(p.vendor)}</span>` : ''}</p></div>
+      <div class="pj-acts">${fin ? '' : B('完成這關 →','',`data-pjnext="${p.id}"`)}${B('記一筆進度','ghost',`data-pjlog="${p.id}"`)}${B('修改','ghost sm',`data-pjedit="${p.id}"`)}</div></header>
+    <div class="pj-grid">
+      <section class="cd-sec pj-flowsec"><h3 class="cd-h3">流程<span>${fin ? '已結案' : `第 ${p.stage + 1}／${N} 關・${pjBall(p) === '我' ? '換你' : '等' + esc(pjBall(p))}`}</span></h3>
+        <ol class="pj-flow">${flow}<li class="pf end${fin ? ' cur' : ''}"><span class="pf-who"></span><span class="pf-box"><b>結案</b></span></li></ol></section>
+      <div class="pj-side">${quoteHTML(p)}${docsHTML(p, c)}
+        <section class="cd-sec"><h3 class="cd-h3">檔案<span>${(S.files || []).filter(x => x.project === p.id).length} 個</span></h3>${filesHTML((S.files || []).filter(x => x.project === p.id), '收件匣整理進來的檔案會列在這裡')}</section>
+        <section class="cd-sec"><h3 class="cd-h3">進度紀錄<span>${hist.length} 筆</span></h3>
+          ${hist.length ? `<ul class="plog">${hist.map(h => `<li>${tstamp(h.date.slice(5).replace('-','/') + ' ' + h.time)}<span>${progHTML(h, c)}</span></li>`).join('')}</ul>` : '<p class="cd-none">還沒有進度紀錄</p>'}</section>
+      </div>
+    </div></div></section>`;
+}
+/* 報價試算：廠商單價（未稅）×（1＋加成）＝報價單價，四捨五入到元；稅 5% 另計。跟伺服器 quoteCalc_ 同一套 */
+function calcQuote(items, markup){
+  const m = Number(markup) || 0;
+  const rows = items.filter(x => x.n).map(x => { const price = x.p !== '' && x.p != null ? Number(x.p) : Math.round((Number(x.c) || 0) * (1 + m / 100));
+    return { n: x.n, q: Number(x.q) || 0, u: x.u || '', c: Number(x.c) || 0, price, amount: price * (Number(x.q) || 0), cost: (Number(x.c) || 0) * (Number(x.q) || 0) }; });
+  const net = rows.reduce((s, r) => s + r.amount, 0), cost = rows.reduce((s, r) => s + r.cost, 0), tax = Math.round(net * 0.05);
+  return { rows, net, tax, total: net + tax, cost, profit: net - cost };
+}
+function quoteHTML(p){
+  const items = p.items.length ? p.items : [{ n: '', q: 1, u: '式', c: '' }];
+  return `<section class="cd-sec pj-quote" id="quote" data-quote="${p.id}"><h3 class="cd-h3">報價試算<span>金額未稅、稅 5% 另計</span></h3>
+    <div class="qt-top"><label>廠商<input id="qVendor" value="${esc(p.vendor)}" autocomplete="off"></label><label>加成 %<input id="qMarkup" inputmode="decimal" value="${esc(p.markup === '' ? '' : p.markup)}" autocomplete="off"></label></div>
+    <div class="qt-scroll"><table class="qt"><thead><tr><th>品名</th><th>數量</th><th>單位</th><th>廠商單價</th><th>報價金額</th><th><span class="sr">刪除</span></th></tr></thead>
+      <tbody id="qBody">${items.map(quoteRow).join('')}</tbody></table></div>
+    <button class="qt-add" data-qadd>＋ 加一列</button>
+    <dl class="qt-sum" id="qSum"></dl>
+    <div class="qt-foot">${B('存檔','',`data-qsave="${p.id}"`)}${B('複製明細，貼進 BCRM','ghost',`data-qcopy="${p.id}"`)}</div></section>`;
+}
+const quoteRow = x => `<tr><td><input aria-label="品名" data-qf="n" value="${esc(x.n)}" autocomplete="off"></td><td><input aria-label="數量" data-qf="q" inputmode="decimal" value="${esc(x.q)}"></td>
+  <td><input aria-label="單位" data-qf="u" value="${esc(x.u)}" autocomplete="off"></td><td><input aria-label="廠商單價（未稅）" data-qf="c" inputmode="decimal" value="${esc(x.c)}"></td>
+  <td class="num"><span data-qa></span><small data-qp></small></td><td><button class="qt-del" data-qdel aria-label="刪除這列">×</button></td></tr>`;
+function quoteRead(){
+  const items = [...document.querySelectorAll('#qBody tr')].map(tr => { const v = k => tr.querySelector(`[data-qf="${k}"]`).value.trim(); return { n: v('n'), q: v('q'), u: v('u'), c: v('c') }; });
+  return { vendor: document.getElementById('qVendor').value.trim(), markup: document.getElementById('qMarkup').value.trim(), tax: '外加', items };
+}
+function quoteRecalc(){
+  if (!document.getElementById('qBody')) return;
+  const q = quoteRead(), m = Number(q.markup) || 0;
+  document.querySelectorAll('#qBody tr').forEach((tr, i) => { const x = q.items[i], price = Math.round((Number(x.c) || 0) * (1 + m / 100));
+    tr.querySelector('[data-qp]').textContent = x.n || x.c ? '單價 ' + money(price) : ''; tr.querySelector('[data-qa]').textContent = x.n || x.c ? money(price * (Number(x.q) || 0)) : ''; });
+  const r = calcQuote(q.items, q.markup), pct = r.net ? Math.round(r.profit / r.net * 100) : 0;
+  document.getElementById('qSum').innerHTML = `<div><dt>成本</dt><dd>${money(r.cost)}</dd></div><div><dt>報價（未稅）</dt><dd>${money(r.net)}</dd></div>
+    <div><dt>稅 5%</dt><dd>${money(r.tax)}</dd></div><div class="tot"><dt>含稅總計</dt><dd>${money(r.total)}</dd></div><div><dt>毛利</dt><dd class="${r.profit < 0 ? 'neg' : ''}">${money(r.profit)}<small>${pct}%</small></dd></div>`;
+}
+/* 文件：報價單、驗收單都從報價試算存檔的品項與客戶資料自動填入（Google 文件＋PDF）；開發票是一段可以貼 LINE 的文字 */
+function docsHTML(p, c){
+  const miss = c ? [['addr', '地址'], ['contact', '窗口'], ['tax', '統編']].filter(([k]) => !c[k]).map(([, l]) => l) : ['客戶'];
+  if (!p.items.length) miss.push('報價品項');
+  const fix = miss.some(m => m !== '報價品項') && c ? B('補客戶資料','ghost sm',`data-editclient="${c.id}"`) : '';
+  const row = kind => { const a = p.docs && p.docs[kind];
+    return `<div class="doc-row"><b>${kind}</b><span class="doc-st">${a ? `<a href="${esc(a.pdf)}" target="_blank" rel="noopener">PDF</a><a href="${esc(a.doc)}" target="_blank" rel="noopener">Google 文件</a><small>${esc(String(a.at).slice(5).replace('-','/'))}</small>`
+      : miss.length ? `<span class="miss">還缺 ${esc(miss.join('、'))}</span>` : '可以產生了'}</span>
+      <span class="doc-acts">${a ? '' : fix}${B(a ? '重新產生' : '產生' + kind,'sm',`data-gendoc="${p.id}" data-kind="${kind}"`)}</span></div>`; };
+  return `<section class="cd-sec pj-docs"><h3 class="cd-h3">文件</h3>${row('報價單')}${row('驗收單')}
+    <div class="doc-row"><b>開發票</b><span class="doc-st">給祐芹姐的訊息</span><span class="doc-acts">${B('複製訊息','ghost sm',`data-invcopy="${p.id}"`)}</span></div>
+  </section>`;
+}
+function invoiceText(p){
+  const c = client(p.client) || {}, r = calcQuote(p.items, p.markup);
+  return ['祐芹姐好，麻煩幫我開發票：', `抬頭：${c.title || c.name || ''}`, `統編：${c.tax || '（未填）'}`,
+    `金額：含稅 ${money(r.total)}（未稅 ${money(r.net)}、稅 ${money(r.tax)}）`, '品項：', ...r.rows.map(x => `・${x.n} ${x.q}${x.u}　${money(x.amount)}`),
+    `專案：${p.name}`, '用印驗收單與報價單在附件，謝謝！'].join('\n');
+}
+function bcrmText(p){
+  const r = calcQuote(p.items, p.markup);
+  return ['品名\t數量\t單位\t單價\t金額', ...r.rows.map(x => `${x.n}\t${x.q}\t${x.u}\t${x.price}\t${x.amount}`), `合計（未稅）\t\t\t\t${r.net}`].join('\n');
+}
+function copyText(text, msg){ (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toast(msg), () => { sheet(`<h3>手動複製</h3><textarea rows="8" readonly>${esc(text)}</textarea><div class="sheet-foot">${B('關閉','ghost sm','data-close')}</div>`); }); }
+
+/* 專案的抽屜：開新專案、記一筆進度（可選關卡）、修改 */
+function newProjectSheet(){
+  S.pjScale = '簡單案';
+  sheet(`<h3>新專案</h3>
+    <label for="ncClient">客戶</label><input id="ncClient" autocomplete="off"><div class="pick sug" id="ncSug"></div>
+    <label for="pjName">專案名稱</label><input id="pjName" autocomplete="off">
+    <h4>規模</h4><div class="pick" role="group" aria-label="規模" id="pjScalePick">${['簡單案','大案'].map(v => `<button aria-pressed="${v === S.pjScale}" data-pjscale="${v}"><span>${v}</span></button>`).join('')}</div>
+    <label for="pjVendor">廠商（選填）</label><input id="pjVendor" autocomplete="off">
+    <label for="pjNote">補一句（選填）</label><input id="pjNote" autocomplete="off">
+    <div class="sheet-foot">${B('建立專案','','data-pjcreate')}${B('取消','ghost sm','data-close')}</div>`);
+  const cc = S.view === 'clients' && S.clientId && client(S.clientId); if (cc) document.getElementById('ncClient').value = cc.name;
+  renderSug();
+}
+function pjLogSheet(p, pick){
+  S.pjPick = pick == null ? '' : String(pick);
+  const opts = [...pjSteps().map((s, i) => [i, pjStepName(p, i)]), [PJ_N(), '結案']];
+  sheet(`<h3>${esc(p.name)}</h3><div class="sheet-head"><p>目前<b>${esc(pjStepName(p, p.stage))}</b><span>${p.stage >= PJ_N() ? '' : pjBall(p) === '我' ? '換你' : '等' + esc(pjBall(p))}</span></p></div>
+    <label for="pjLogNote">這次的進度</label><textarea id="pjLogNote" rows="2"></textarea>
+    <h4>推進到（選填）</h4>
+    <div class="stages" role="group" aria-label="關卡">${opts.map(([i, n]) => `<button class="stage${i === p.stage ? ' cur' : ''}" aria-pressed="${S.pjPick === String(i)}" data-pjpick="${i}"${i === p.stage ? ' aria-disabled="true"' : ''}>
+      <span class="no">${String(i + 1).padStart(2, '0')}</span><b>${esc(n)}</b><small>${i === p.stage ? '<em>目前</em>' : ''}${i < PJ_N() ? esc(pjSteps()[i].who) : ''}</small></button>`).join('')}</div>
+    <div class="sheet-foot">${B('記下進度','',`data-pjapply="${p.id}"`)}${B('關閉','ghost sm','data-close')}</div>`);
+}
+function pjEditSheet(p){
+  const c = client(p.client); S.pjScale = p.scale;
+  sheet(`<h3>修改專案</h3>
+    <label for="ncClient">客戶</label><input id="ncClient" autocomplete="off" value="${esc(c ? c.name : '')}"><div class="pick sug" id="ncSug"></div>
+    <label for="pjName">專案名稱</label><input id="pjName" autocomplete="off" value="${esc(p.name)}">
+    <h4>規模</h4><div class="pick" role="group" aria-label="規模" id="pjScalePick">${['簡單案','大案'].map(v => `<button aria-pressed="${v === S.pjScale}" data-pjscale="${v}"><span>${v}</span></button>`).join('')}</div>
+    <label for="pjNote">備註</label><input id="pjNote" autocomplete="off" value="${esc(p.note)}">
+    <div class="sheet-foot">${B('存檔','',`data-pjsave="${p.id}"`)}${B('取消','ghost sm','data-close')}<button class="danger" data-pjdel="${p.id}">刪除專案</button></div>`);
+  renderSug();
+}
+/* 業務案件轉成專案：名稱、規模、從哪一關開始（預設「找廠商」）；案件的紀錄與行程都搬過去 */
+function toProjectSheet(k){
+  const c = client(k.client); S.pjScale = '簡單案'; S.pjPick = '1';
+  const p0 = { scale: S.pjScale };
+  sheet(`<h3>轉成專案</h3><p>${esc(nick(c))}・${esc(k.action)}・${esc(k.product)}（${esc(shortStep(k.progress))}）的進度紀錄和行程會一起搬到專案，這件業務案件會拿掉。</p>
+    <label for="pjName">專案名稱</label><input id="pjName" autocomplete="off" value="${esc(k.action + '・' + k.product)}">
+    <h4>規模</h4><div class="pick" role="group" aria-label="規模">${['簡單案','大案'].map(v => `<button aria-pressed="${v === S.pjScale}" data-pjscale="${v}"><span>${v}</span></button>`).join('')}</div>
+    <h4>從哪一關開始</h4>
+    <div class="stages" role="group" aria-label="關卡">${pjSteps().map((s, i) => `<button class="stage" aria-pressed="${S.pjPick === String(i)}" data-pjpick="${i}"><span class="no">${String(i + 1).padStart(2, '0')}</span><b>${esc(pjStepName(p0, i))}</b><small>${esc(s.who)}</small></button>`).join('')}</div>
+    <div class="sheet-foot">${B('轉成專案','',`data-toprojgo="${k.id}"`)}${B('取消','ghost sm','data-close')}</div>`);
+}
+
+/* ---------- 雲端工作站 ----------
+   收件匣：在哪台電腦拿到檔案都丟進去，排程（12:30、17:30）會看內容、改名、歸到客戶與專案資料夾。
+   這裡顯示還有幾個在等，按一下直接在雲端硬碟打開收件匣；還沒建就給一顆「建立工作站」。 */
+function stationHTML(){
+  const st = S.station;
+  if (!st) return `<div class="st-card"><div class="st-row"><div class="st-txt"><b>雲端工作站</b><span>拿到的檔案丟進收件匣，排程幫你分類歸檔</span></div>${B('建立工作站','sm','data-station')}</div></div>`;
+  const msg = st.waiting == null ? '拿到的檔案丟進來' : st.waiting ? `還有 <em>${st.waiting}</em> 個檔案等整理` : '都整理好了';
+  return `<div class="st-card"><div class="st-row"><div class="st-txt"><b>收件匣</b><span>${msg}</span></div>
+    <a class="btn sm ghost" href="${esc(st.inbox)}" target="_blank" rel="noopener"><span>打開收件匣</span></a></div>
+    <form class="st-search" id="fileSearch" role="search"><label for="fq" class="sr">搜尋整理過的檔案</label><input id="fq" type="search" autocomplete="off" enterkeyhint="search"><button class="btn sm ghost" type="submit"><span>搜尋檔案</span></button></form></div>`;
+}
+/* 收件匣還有幾個檔案：數雲端硬碟很慢，不放在每次的 getState 裡；打開 App 後在背景問一次（10 分鐘內不重問），只更新那張卡片 */
+let stationAt = 0;
+function refreshStation(force){
+  if (!S.station || (!force && Date.now() - stationAt < 600000)) return;
+  stationAt = Date.now();
+  call('stationCount').then(n => {
+    if (!S.station) return;
+    S.station.waiting = n;
+    document.querySelectorAll('.st-card').forEach(el => { const q = el.querySelector('#fq')?.value || ''; el.outerHTML = stationHTML(); const i = document.getElementById('fq'); if (i && q) i.value = q; });
+  }).catch(() => {});
+}
+/* 搜尋檔案：直接查畫面上已經有的檔案索引（檔名、類型、資料夾、摘要、關鍵字、客戶與專案名稱），不用等伺服器 */
+function searchFilesLocal(q){
+  const words = String(q || '').toLowerCase().split(/[\s　]+/).filter(Boolean);
+  if (!words.length) return [];
+  return (S.files || []).filter(f => {
+    const c = client(f.client), p = pjById(f.project);
+    const hay = [f.name, f.type, f.folder, f.summary, f.keywords, f.date, c ? [c.name, ...c.alias].join(' ') : '', p ? p.name : ''].join(' ').toLowerCase();
+    return words.every(w => hay.includes(w));
+  }).slice(0, 50);
+}
+function searchSheet(q){
+  const hits = searchFilesLocal(q);
+  sheet(`<h3>搜尋「${esc(q)}」</h3><p class="hint">${hits.length ? `找到 ${hits.length} 個檔案` : '沒有符合的檔案'}</p>
+    ${hits.length ? `<div class="fls">${hits.map(x => fileRow(Object.assign({}, x, { summary: [x.folder, x.summary].filter(Boolean).join('　') }))).join('')}</div>` : ''}
+    <div class="sheet-foot">${B('關閉','ghost sm','data-close')}</div>`);
+}
+/* 整理過的檔案：一列一個（縮圖、類型標籤、檔名、日期），點了在 App 裡預覽 */
+const fileRow = x => `<button class="fl" type="button" data-file="${esc(x.id)}">${thumbHTML(x.id, 'fl-th')}<span class="cat-tag">${esc(x.type)}</span><span class="fl-n">${esc(x.name)}${x.summary ? `<small>${esc(x.summary)}</small>` : ''}</span><span class="fl-d">${esc(String(x.date || '').slice(5).replace('-','/'))}</span></button>`;
+function filesHTML(list, empty){
+  return list.length ? `<div class="fls">${list.map(fileRow).join('')}</div>` : `<p class="cd-none">${empty}</p>`;
+}
+
+/* ---------- 檔案縮圖與預覽 ----------
+   縮圖由伺服器從雲端硬碟抓回來（手機不用登入 Google）。畫面先畫空框，畫完再補圖；同一個檔案這次打開 App 只問一次。 */
+S.thumbs = {}; S.big = {};
+// 只收圖片的 data URL（伺服器回來的東西直接放進 src 前先確認格式）
+const safeImg = u => typeof u === 'string' && /^data:image\/[\w.+-]+;base64,[A-Za-z0-9+/=]+$/.test(u) ? u : '';
+const fileById = id => (S.files || []).find(x => x.id === id);
+const thumbHTML = (id, cls) => `<span class="${cls}" data-thumb="${esc(id)}" aria-hidden="true">${S.thumbs[id] ? `<img src="${S.thumbs[id]}" alt="">` : ''}</span>`;
+let thumbAsked = {};
+function hydrateThumbs(){
+  const want = [...new Set([...document.querySelectorAll('[data-thumb]')].map(el => el.dataset.thumb))]
+    .filter(id => !(id in S.thumbs) && !thumbAsked[id] && !id.startsWith('tmp'));
+  for (let i = 0; i < want.length; i += 12) {
+    const ids = want.slice(i, i + 12); ids.forEach(id => (thumbAsked[id] = 1));
+    call('fileThumbs', ids, 240).then(r => {
+      ids.forEach(id => { S.thumbs[id] = safeImg(r[id]); });
+      document.querySelectorAll('[data-thumb]').forEach(el => { const u = S.thumbs[el.dataset.thumb]; if (u && !el.firstChild) el.innerHTML = `<img src="${u}" alt="">`; });
+    }).catch(() => ids.forEach(id => delete thumbAsked[id]));
+  }
+}
+function fileSheet(id){
+  const f = fileById(id), m = f ? null : formById(id); if (!f && !m) return;
+  const name = f ? f.name : m.name;
+  const c = f && client(f.client), p = f && f.project ? pjById(f.project) : null, k = f && f.case ? kase(f.case) : null;
+  const row = (l, v) => v ? `<div class="cd-f"><dt>${l}</dt><dd>${v}</dd></div>` : '';
+  const img = u => u ? `<img src="${u}" alt="${esc(name)} 的預覽">` : `<span class="fp-msg">這種檔案沒有預覽，按「開啟原檔」看</span>`;
+  const meta = f ? `${row('類型', esc(f.type))}${row('日期', esc(f.date || ''))}
+      ${row('客戶', c ? `<button class="link" data-client="${c.id}">${esc(nick(c))}</button>` : '')}
+      ${row('專案', p ? `<button class="link" data-proj="${p.id}">${esc(p.name)}</button>` : '')}
+      ${row('案件', k ? esc([k.action, k.product].filter(Boolean).join('・')) : '')}
+      ${row('資料夾', esc(f.folder || ''))}${row('摘要', esc(f.summary || ''))}`
+    : `${row('業務', esc(m.biz))}${row('類別', esc([m.kind, m.sub].filter(Boolean).join('・')))}${row('代碼', esc(m.code))}${row('檔名', esc(m.file))}`;
+  const fromPicker = S.fpOpen;   // 從申請書挑選畫面點進來的：多一個「返回」回去繼續勾
+  sheet(`<h3>${esc(name)}</h3>
+    <div class="fp"><div class="fp-img" id="fpImg">${id in S.big ? img(S.big[id]) : '<span class="fp-msg">載入預覽…</span>'}</div>
+    ${m ? '<p class="hint">這裡只看得到第一頁，要看全部或列印請按「開啟原檔」</p>' : ''}
+    <dl class="cd-info fp-meta">${meta}</dl></div>
+    <div class="sheet-foot"><a class="btn sm" href="${esc(f ? f.url : m.url)}" target="_blank" rel="noopener"><span>開啟原檔</span></a>${fromPicker ? B('返回','ghost sm','data-fmback') : ''}${B('關閉','ghost sm','data-close')}</div>`);
+  S.fpOpen = fromPicker;
+  if (id in S.big) return;
+  call('fileThumbs', [id], 1600).then(r => { S.big[id] = safeImg(r[id]); const el = document.getElementById('fpImg'); if (el) el.innerHTML = img(S.big[id]); })
+    .catch(() => { const el = document.getElementById('fpImg'); if (el) el.innerHTML = '<span class="fp-msg">預覽載入失敗，按「開啟原檔」看</span>'; });
+}
+
+/* 一筆紀錄的相關檔案：同一位客戶，而且（同一件案件、紀錄裡提到檔案的關鍵字或類型、或日期前後 3 天內）。最多 2 個，新的在前 */
+const dayDiff = (a, b) => Math.abs((new Date(a) - new Date(b)) / 864e5);
+function relatedFiles(it){
+  const c = itemClient(it); if (!c || !(S.files || []).length) return [];
+  const names = [c.name, ...c.alias];
+  const hit = f => {
+    // 案件轉成專案後，紀錄的案件欄放的是專案 id
+    if (it.case && (f.case === it.case || f.project === it.case)) return true;
+    // 早期整理的檔案沒有關鍵字：改用資料夾名稱的每一層
+    const words = String(f.keywords || f.folder || '').split(/[、,，\s／/]+/).filter(w => w.length >= 2 && !names.includes(w));
+    if (words.some(w => it.text.includes(w))) return true;
+    const t = String(f.type || '').replace(/單$/, '');
+    if (t.length >= 2 && it.text.includes(t)) return true;
+    return f.date && it.date && dayDiff(f.date, it.date) <= 3;
+  };
+  return S.files.filter(f => f.client === c.id && hit(f)).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 2);
+}
+// inButton：放在案件卡（本身是按鈕）裡面時不能再放按鈕，改用 span；點擊一律由 [data-file] 先攔下來
+const relHTML = (list, inButton) => list.length ? `<span class="rfs">${list.map(f => { const tag = inButton ? 'span' : 'button';
+  return `<${tag} class="rf" ${inButton ? 'role="link"' : 'type="button"'} data-file="${esc(f.id)}" aria-label="相關檔案：${esc(f.name)}">${thumbHTML(f.id, 'rf-th')}<span>${esc(f.type)}・${esc(String(f.date || '').slice(5).replace('-', '/'))}</span></${tag}>`; }).join('')}</span>` : '';
+const caseFiles = k => (S.files || []).filter(f => f.case === k.id).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 2);
+
+/* ---------- 申請書庫 ----------
+   工作站「申請書庫」裡的申請書、同意書、切結書。業務分類後（歸到案件或開新案件）接著跳出挑選畫面，
+   你自己勾這件要用哪幾份，存好後案件卡上列出來、點了就預覽。伺服器不幫忙判斷。 */
+const FORM_BIZ = ['固網寬頻', '行動業務', '市內電話', '資安', '行動物聯網', '跨業務通用'];
+const formById = id => (S.forms || []).find(m => m.id === id);
+const formBizList = () => { const all = S.forms || [], have = new Set(all.map(m => m.biz)); return [...FORM_BIZ.filter(b => have.has(b)), ...[...have].filter(b => !FORM_BIZ.includes(b))]; };
+// 依案件的動作、產品先打開比較可能的那一頁（只決定先看哪頁，勾哪幾份還是你自己選）
+function guessBiz(k){
+  const p = k ? k.action + ' ' + k.product : '';
+  return /資安|防護|防禦/.test(p) ? '資安' : /物聯|IoT|CMP/i.test(p) ? '行動物聯網' : /行動|SIM|門號|手機|5G|4G/i.test(p) ? '行動業務'
+    : /市話|電話/.test(p) ? '市內電話' : /光世代|寬頻|HiNet|ADSL|專線|固定IP|固網|1G|2G/i.test(p) ? '固網寬頻' : '';
+}
+const formLabel = m => m.code || (m.name.length > 12 ? m.name.slice(0, 12) + '…' : m.name);
+const formChips = (ids, inButton) => { const ms = (ids || []).map(formById).filter(Boolean); if (!ms.length) return '';
+  const tag = inButton ? 'span' : 'button';
+  return `<span class="rfs">${ms.map(m => `<${tag} class="rf rf-form" ${inButton ? 'role="link"' : 'type="button"'} data-file="${esc(m.id)}" aria-label="申請書：${esc(m.name)}">${thumbHTML(m.id, 'rf-th')}<span>${esc(formLabel(m))}</span></${tag}>`).join('')}</span>`; };
+// 已選的小標（可以點掉）
+function formSelHTML(){
+  const fp = S.fp, selMs = fp.caseId ? fp.sel.map(formById).filter(Boolean) : [];
+  return selMs.length ? `<span>已選 ${selMs.length} 份</span>${selMs.map(m => `<button class="rf" type="button" data-fmpick="${esc(m.id)}" aria-label="取消 ${esc(m.name)}"><span>${esc(formLabel(m))}</span><b aria-hidden="true">×</b></button>`).join('')}` : '';
+}
+// 業務分頁＋清單（搜尋時改成跨業務的結果）
+function formBodyHTML(){
+  const fp = S.fp, caseId = fp.caseId, all = S.forms || [], q = fp.q.trim().toLowerCase();
+  const list = q ? all.filter(m => [m.name, m.code, m.file, m.biz, m.kind, m.sub].join(' ').toLowerCase().includes(q)) : all.filter(m => m.biz === fp.biz);
+  const groups = {}; list.forEach(m => { const g = [m.kind, m.sub].filter(Boolean).join('・') || '其他'; (groups[g] = groups[g] || []).push(m); });
+  const row = m => { const on = fp.sel.includes(m.id);
+    return `<div class="fm-row${on ? ' on' : ''}">${caseId ? `<button class="fm-pick" type="button" data-fmpick="${esc(m.id)}" aria-pressed="${on}">` : `<button class="fm-pick" type="button" data-file="${esc(m.id)}">`}
+      <span class="fm-ck" aria-hidden="true"></span>${thumbHTML(m.id, 'fl-th')}<span class="fm-n">${esc(m.name)}${q ? `<small>${esc(m.biz)}</small>` : ''}</span></button>
+      ${caseId ? `<button class="btn ghost sm fm-eye" type="button" data-file="${esc(m.id)}" aria-label="預覽 ${esc(m.name)}"><span>預覽</span></button>` : ''}</div>`; };
+  return (q ? `<p class="hint">搜尋「${esc(fp.q)}」：${list.length} 份</p>` : `<div class="frow fm-biz" role="group" aria-label="業務">${formBizList().map(b => `<button type="button" data-fmbiz="${esc(b)}" aria-pressed="${fp.biz === b}"><span>${esc(b)}</span></button>`).join('')}</div>`)
+    + `<div class="fm-list">${Object.entries(groups).map(([g, ms]) => `<h4>${esc(g)}</h4>${ms.map(row).join('')}`).join('') || '<p class="cd-none">沒有符合的申請書</p>'}</div>`;
+}
+/* keep：勾選、換分頁、打字時只重畫已選與清單（整張重畫會讓清單跳回最上面，打中文時還會打斷選字） */
+function formSheet(caseId, keep){
+  const body = document.getElementById('fmBody');
+  if (keep && body && S.fpOpen) { body.innerHTML = formBodyHTML(); document.getElementById('fmSel').innerHTML = formSelHTML(); hydrateThumbs(); return; }
+  const k = caseId ? kase(caseId) : null, all = S.forms || [];
+  if (!keep) S.fp = { caseId, sel: k ? (k.forms || []).slice() : [], biz: guessBiz(k) || formBizList()[0] || '', q: '' };
+  sheet(`<h3>${k ? '這件要用的申請書' : '申請書庫'}</h3>
+    ${k ? `<p class="hint">${esc(nick(client(k.client)))}・${esc(k.action)}・${esc(k.product)}。勾好按「存好」，案件卡上會列出來</p>` : ''}
+    ${!all.length ? '<p class="cd-none">申請書庫是空的。把申請書放進雲端硬碟「工作站／申請書庫」，再按「更新申請書庫」</p>' : ''}
+    <div class="fm-sel" id="fmSel">${formSelHTML()}</div>
+    ${all.length ? `<div class="fm-search"><label for="fmq">找代碼或名稱</label><input id="fmq" type="search" value="${esc(S.fp.q)}" autocomplete="off" enterkeyhint="search"></div>
+    <div id="fmBody">${formBodyHTML()}</div>` : ''}
+    <div class="sheet-foot">${k ? B('存好', '', 'data-fmsave') : ''}${B('更新申請書庫', 'ghost sm', 'data-fmsync')}${B(k ? '先不選' : '關閉', 'ghost sm', 'data-close')}</div>`);
+  S.fpOpen = true;
+  const inp = document.getElementById('fmq');
+  if (inp) {
+    const go = () => { S.fp.q = inp.value; formSheet(caseId, true); };
+    inp.addEventListener('input', e => { if (!e.isComposing) go(); });   // 注音、拼音還在選字時先不動
+    inp.addEventListener('compositionend', go);
+  }
+}
+/* 業務分類完（歸到案件、開新案件）接著問要哪些申請書；申請書庫是空的就不問 */
+function askForms(caseId){ if (!(S.forms || []).length) return false; formSheet(caseId); return true; }
+/* 存好：剛開的新案件還沒有真的 id（tmp），先記著，等伺服器回來找到那件再送 */
+function saveForms(){
+  const fp = S.fp, k = kase(fp.caseId); if (!k) { closeSheet(); return; }
+  k.forms = fp.sel.slice();
+  if (String(k.id).startsWith('tmp')) S.pendingForms = { client: k.client, action: k.action, product: k.product, ids: fp.sel.slice() };
+  else server('setCaseForms', k.id, fp.sel);
+  closeSheet(); render(); toast(fp.sel.length ? `已記下 ${fp.sel.length} 份申請書` : '已清空這件的申請書'); nextConfirm();
+}
+
+/* 專案頁之外打開專案（右欄、追蹤分頁、客戶頁） */
+function openProject(id){ closeSheet(); S.view = 'projects'; S.projectId = id; S.clientId = null; S.qDraft = null; S.anim = true; render(true); scrollTo(0, 0); }
+
+/* ---------- 事件 ---------- */
+/* 紀錄的操作選單：點那一筆打開、點別處或按 Esc 關閉 */
+function closeMenus(except){ document.querySelectorAll('[data-menu].open').forEach(r => { if (r !== except) { r.classList.remove('open'); r.setAttribute('aria-expanded','false');
+  r.querySelectorAll('.del.arm').forEach(b => { b.classList.remove('arm'); b.textContent = b.dataset.label; }); } }); }
+function toggleMenu(row){ const open = !row.classList.contains('open'); closeMenus(row); row.classList.toggle('open', open); row.setAttribute('aria-expanded', String(open)); }
+document.addEventListener('click', e => {
+  // 檔案（清單、紀錄下的相關檔案、案件卡上的檔案）：先攔下來開預覽，不要觸發外層的紀錄選單或案件進度
+  const fileEl = e.target.closest('[data-file]');
+  if (fileEl) { e.preventDefault(); closeMenus(); fileSheet(fileEl.dataset.file); return; }
+  const row = e.target.closest('[data-menu]');
+  if (row && !e.target.closest('.menu button, .ask-go, .c-reply, .rf')) { toggleMenu(row); return; }
+  // 刪除要按兩次：第一次只把按鈕變成「再按一次刪除」
+  const arm = e.target.closest('.menu button.del:not(.arm)');
+  if (arm) { arm.classList.add('arm'); arm.textContent = '再按一次刪除'; return; }
+  closeMenus();
+  const t = e.target.closest('button,[data-close]'); if (!t) return;
+  if (t.matches('.scrim, .stage-brief') && e.target !== t) return;
+  const d = t.dataset;
+  if (d.close !== undefined) { closeSheet(); S.back = null; nextConfirm(); return; }
+  if (d.nav) { navTo(d.nav, t); return; }
+  if (d.hometab) { S.homeTab=d.hometab; S.anim=true; render(); return; }
+  if (d.mtab) { S.mtab = d.mtab; render(); const bar = document.querySelector('.mtabs'); if (bar && bar.getBoundingClientRect().top < 0) bar.scrollIntoView(); return; }
+  if (d.client) { if (d.client.startsWith('tmp')) { toast('還在存，等一下再試'); return; } closeSheet(); S.view='clients'; S.clientId=d.client; S.histAll=false; S.tlk='全部'; S.anim=true; render(true); scrollTo(0,0); return; }
+  if (d.back !== undefined) { S.clientId=null; S.anim=true; render(true); return; }
+  if (d.f) { S.f[d.f]=d.v; render(); return; }
+  if (d.fmpick) { const s = S.fp.sel, i = s.indexOf(d.fmpick); if (i >= 0) s.splice(i, 1); else s.push(d.fmpick); formSheet(S.fp.caseId, true); return; }
+  if (d.fmbiz) { S.fp.biz = d.fmbiz; formSheet(S.fp.caseId, true); document.querySelector('.sheet-in')?.scrollTo(0, 0); return; }
+  if (d.fmsave !== undefined) { saveForms(); return; }
+  if (d.fmback !== undefined) { formSheet(S.fp.caseId, true); return; }
+  if (d.fmlib !== undefined) { formSheet(null); return; }
+  if (d.fmforms) { if (waitTmp(d.fmforms)) return; formSheet(d.fmforms); return; }
+  if (d.fmsync !== undefined) {
+    t.disabled = true; t.textContent = '更新中…';
+    queued('syncForms').then(r => { S.forms = r.forms; formSheet(S.fp ? S.fp.caseId : null, !!S.fp); toast(`申請書庫：${r.forms.length} 份`); })
+      .catch(e => { t.disabled = false; t.textContent = '更新申請書庫'; toast('沒更新到：' + (e.message || '請稍後再試')); });
+    return;
+  }
+  if (d.file) { fileSheet(d.file); return; }
+  if (d.copy) { navigator.clipboard?.writeText(d.copy).then(()=>toast('已複製電話'), ()=>toast(d.copy)); return; }
+  if (d.prog) { if (d.prog.startsWith('tmp')) { toast('還在存，等一下再試'); return; } progSheet(kase(d.prog)); return; }
+  if (d.pick) {
+    if (t.getAttribute('aria-disabled') === 'true') { toast('這已經是目前的階段'); return; }
+    const on = t.getAttribute('aria-pressed') !== 'true';
+    t.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    t.setAttribute('aria-pressed', String(on)); S.pstep = on ? d.pick : ''; return;
+  }
+  if (d.apply) {
+    const k = kase(d.apply), noteEl = document.getElementById('pnote'), note = noteEl.value.trim(), step = S.pstep === k.progress ? '' : S.pstep;
+    if (!step && !note) { toast('寫一句進度，或選一個階段'); noteEl.focus(); return; }
+    const status = step ? (S.stepStatus[step] || '進行中') : k.status;
+    Object.assign(k, {updated:S.today, note});
+    if (step) Object.assign(k, {progress:step, status, closed: status==='已結案' ? S.today : ''});
+    S.items.push({id:'tmp'+Date.now(), date:S.today, time:stamp(new Date()).slice(11), cat:'業務', client:k.client, case:k.id,
+      text: step ? `進度 → ${shortStep(step)}${note?'：'+note:''}` : note, source:'手動', fresh:true});
+    if (step) S.adv = k.id; S.flash=['業務']; S.bump=['業務']; if (step && status==='已結案') S.justClosed = k.id;
+    server('updateProgress', k.id, step, note);
+    const msg = step && status==='已結案' ? '最終回！案件完結'
+      : step && status==='等待中' ? `${nick(client(k.client))}：${shortStep(step)}・等回覆（在「案件」頁）`
+      : `${nick(client(k.client))}：${step ? shortStep(step) : '記下進度'}`;
+    closeSheet(); render(); toast(msg);
+    if (window.Fog) Fog.stir(innerWidth / 2, innerHeight / 2, step && status==='已結案' ? 2.2 : 1);
+    return;
+  }
+  if (d.addstep) {
+    const inp = document.getElementById('newstep'), v = inp.value.trim(); if (!v) { inp.focus(); return; }
+    const note = document.getElementById('pnote').value;
+    queued('addStep', v, '進行中').then(st => { load(st); progSheet(kase(d.addstep), {note, pick:v}); toast(`已新增階段「${v}」`); }).catch(() => toast('沒存到，請稍後再試'));
+    return;
+  }
+  if (d.brief !== undefined) { showBrief(true); return; }
+  if (d.askall !== undefined) { S.askAll = !S.askAll; render(); return; }
+  if (d.reply) {
+    const it = itemFor(d.reply); if (!it) return;
+    sheet(`<h3>已回覆</h3><p>${esc(bare(it.text, itemClient(it)))}</p><label for="replyText">怎麼回的（選填）</label><input id="replyText" autocomplete="off">
+      <div class="sheet-foot">${B('存檔','',`data-savereply="${it.id}"`)}${B('取消','ghost sm','data-close')}</div>`);
+    return;
+  }
+  if (d.savereply) {
+    const it = itemFor(d.savereply); if (!it) return;
+    const v = document.getElementById('replyText').value.trim();
+    it.reply = v || '已回覆'; it.fresh = true; closeSheet(); render(); toast('已標成回覆過');
+    serverItem(it, 'replyAsk', v); return;
+  }
+  if (d.opencase !== undefined) { caseSheet(null);
+    // 在客戶頁按「開新案件」：客戶先幫忙填好
+    const cc = S.view==='clients' && S.clientId && client(S.clientId), inp = document.getElementById('ncClient');
+    if (cc && inp) { inp.value = cc.name; renderSug(); }
+    return; }
+  if (d.editcase) { if (d.editcase.startsWith('tmp')) { toast('還在存，等一下再試'); return; } caseEditSheet(kase(d.editcase)); return; }
+  if (d.savecase) {
+    const k = kase(d.savecase), cn = document.getElementById('ncClient').value.trim();
+    if (!cn) { toast('先填客戶'); document.getElementById('ncClient').focus(); return; }
+    const old = client(k.client);
+    let cid = k.client;
+    if (!old || old.name !== cn) { const c = S.clients.find(c => c.name===cn || c.alias.includes(cn)); cid = c ? c.id : 'tmpc'+Date.now(); if (!c) S.clients.push({id:cid, name:cn, alias:[]}); }
+    if (cid !== k.client) S.items.forEach(i => { if (i.case===k.id) i.client = cid; });
+    Object.assign(k, { action: S.nc.a, product: S.nc.p, client: cid });
+    closeSheet(); render(); toast('已修改案件');
+    server('editCase', k.id, S.nc.a, S.nc.p, cid === (old && old.id) ? '' : cn); return;
+  }
+  if (d.delcase) {
+    if (!t.classList.contains('arm')) { t.classList.add('arm'); t.textContent = '再按一次刪除案件'; return; }
+    S.cases = S.cases.filter(k => k.id !== d.delcase);
+    S.items = S.items.filter(i => !(i.case===d.delcase && i.prog)); S.items.forEach(i => { if (i.case===d.delcase) i.case = ''; });
+    closeSheet(); render(); toast('已刪除案件'); server('deleteCase', d.delcase); return;
+  }
+  if (d.editclient) { if (d.editclient.startsWith('tmp')) { toast('還在存，等一下再試'); return; } clientSheet(client(d.editclient)); return; }
+  if (d.cf) { S.cf = d.cf; render(); return; }
+  if (d.histall !== undefined) { S.histAll = !S.histAll; render(); return; }
+  if (d.tlk) { S.tlk = d.tlk; S.histAll = false; render(); return; }
+  if (d.calm) { const [y, m] = (S.calMonth || S.today.slice(0, 7)).split('-').map(Number), n = new Date(y, m - 1 + Number(d.calm), 1);
+    S.calMonth = `${n.getFullYear()}-${pad(n.getMonth() + 1)}`; render(); return; }
+  if (d.calday) { S.calSel = d.calday; render(); return; }
+  if (d.caltoday !== undefined) { S.calMonth = S.today.slice(0, 7); S.calSel = S.today; render(); return; }
+  if (d.newclient !== undefined) { clientSheet(null); return; }
+  if (d.cofind !== undefined) { coFind(); return; }
+  if (d.copick !== undefined) { coPick(Number(d.copick)); return; }
+  if (d.addclient !== undefined) {
+    const v = id => document.getElementById(id).value.trim();
+    const f = { name: v('cfName'), alias: v('cfAlias'), phone: v('cfPhone'), contact: v('cfContact'), tax: v('cfTax'), note: v('cfNote'), addr: v('cfAddr'), title: v('cfTitle'), email: v('cfEmail') };
+    if (!f.name) { toast('先填正式名稱'); document.getElementById('cfName').focus(); return; }
+    if (S.clients.some(x => x.name === f.name || x.alias.includes(f.name))) { toast('已經有同名的客戶'); document.getElementById('cfName').focus(); return; }
+    S.clients.push({ id: 'tmp' + Date.now(), name: f.name, alias: f.alias.split(/[、,，\s]+/).filter(Boolean), phone: f.phone, contact: f.contact, tax: f.tax, note: f.note, addr: f.addr, title: f.title, email: f.email });
+    closeSheet(); S.anim = true; render(); toast(`已新增客戶「${f.name}」`);
+    server('addClient', f); return;
+  }
+  if (d.saveclient) {
+    const v = id => document.getElementById(id).value.trim();
+    const f = { name: v('cfName'), alias: v('cfAlias'), phone: v('cfPhone'), contact: v('cfContact'), tax: v('cfTax'), note: v('cfNote'), addr: v('cfAddr'), title: v('cfTitle'), email: v('cfEmail') };
+    if (!f.name) { toast('正式名稱不能空白'); document.getElementById('cfName').focus(); return; }
+    Object.assign(client(d.saveclient), { name: f.name, alias: f.alias.split(/[、,，\s]+/).filter(Boolean), phone: f.phone, contact: f.contact, tax: f.tax, note: f.note, addr: f.addr, title: f.title, email: f.email });
+    closeSheet(); S.anim = true; render(); toast('已修改客戶資料');
+    server('editClient', d.saveclient, f); return;
+  }
+  if (d.delclient) {
+    if (!t.classList.contains('arm')) { t.classList.add('arm'); t.textContent = '再按一次刪除客戶'; return; }
+    S.clients = S.clients.filter(c => c.id !== d.delclient); S.items.forEach(i => { if (i.client===d.delclient) i.client = ''; });
+    S.clientId = null; closeSheet(); S.anim = true; render(); toast('已刪除客戶'); server('deleteClient', d.delclient); return;
+  }
+  /* 待辦 */
+  const waitTmp = id => { if (String(id).startsWith('tmp')) { toast('還在存，等一下再試'); return true; } return false; };
+  if (d.todo) { if (waitTmp(d.todo)) return; const tt = S.todos.find(x => x.id === d.todo); if (!tt) return;
+    tt.done = tt.done ? '' : stamp(new Date()); render(); if (tt.done) toast('做完了'); server('toggleTodo', d.todo); return; }
+  if (d.todoedit) { if (waitTmp(d.todoedit)) return; const tt = S.todos.find(x => x.id === d.todoedit); if (tt) todoSheet(tt); return; }
+  if (d.todosave) { const tt = S.todos.find(x => x.id === d.todosave), el = document.getElementById('tdText'), v = el.value.trim(), due = document.getElementById('tdDue').value;
+    if (!v) { el.focus(); return; } Object.assign(tt, { text: v, due }); closeSheet(); render(); toast('已修改'); server('editTodo', tt.id, v, due); return; }
+  if (d.tododel) { if (!t.classList.contains('arm')) { t.classList.add('arm'); t.textContent = '再按一次刪除'; return; }
+    S.todos = S.todos.filter(x => x.id !== d.tododel); closeSheet(); render(); toast('已刪除'); server('deleteTodo', d.tododel); return; }
+  if (d.todoall !== undefined) { S.todoAll = !S.todoAll; render(); return; }
+  if (d.station !== undefined) {
+    t.disabled = true; t.querySelector('span').textContent = '建立中…';
+    queued('setupStation').then(r => { window.open(r.inbox, '_blank', 'noopener'); return call('getState'); }).then(st => { load(st); render(); refreshStation(true); toast('工作站建好了，拿到的檔案丟進收件匣'); })
+      .catch(e => { render(); const m = String(e && e.message || e); toast(/授權|authoriz|permission|權限/i.test(m) ? '還沒授權雲端硬碟：請在 Apps Script 編輯器執行一次 authorizeDocs' : m); });
+    return;
+  }
+  /* 學到的規則 */
+  if (d.learned !== undefined) { learnedSheet(); return; }
+  if (d.unlearn) { if (!t.classList.contains('arm')) { t.classList.add('arm'); t.textContent = '再按一次'; return; }
+    S.learned = S.learned.filter(r => r.id !== d.unlearn); learnedSheet(); toast('已刪除這條規則'); server('deleteLearning', d.unlearn); return; }
+  /* 專案 */
+  if (d.proj) { if (waitTmp(d.proj)) return; openProject(d.proj); return; }
+  if (d.pjback !== undefined) { S.projectId = null; S.qDraft = null; S.anim = true; render(true); scrollTo(0, 0); return; }
+  if (d.newproj !== undefined) { newProjectSheet(); return; }
+  if (d.pjscale) { S.pjScale = d.pjscale; t.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === t))); return; }
+  if (d.pjcreate !== undefined) {
+    const cEl = document.getElementById('ncClient'), nEl = document.getElementById('pjName'), cn = cEl.value.trim(), name = nEl.value.trim();
+    if (!cn) { toast('先填客戶'); cEl.focus(); return; }
+    if (!name) { toast('先填專案名稱'); nEl.focus(); return; }
+    const vendor = document.getElementById('pjVendor').value.trim(), note = document.getElementById('pjNote').value.trim();
+    const hit = S.clients.find(c => c.name === cn || c.alias.includes(cn)), cid = hit ? hit.id : 'tmpc' + Date.now();
+    if (!hit) S.clients.push({ id: cid, name: cn, alias: [] });
+    (S.projects = S.projects || []).push({ id: 'tmpj' + Date.now(), client: cid, name, scale: S.pjScale, stage: 1, created: S.today, updated: S.today, vendor, markup: '', tax: '外加', items: [], docs: {}, note });
+    closeSheet(); S.view = 'projects'; S.projectId = null; S.clientId = null; S.anim = true; render(true); toast(`新專案：${name}`);
+    server('createProject', cn, name, S.pjScale, vendor, note); return;
+  }
+  if (d.pjnext) { if (waitTmp(d.pjnext)) return; const p = pjById(d.pjnext); if (!p) return;
+    const to = p.stage + 1; p.stage = to; p.updated = S.today;
+    S.items.push({ id: 'tmp' + Date.now(), date: S.today, time: stamp(new Date()).slice(11), cat: '業務', client: p.client, case: p.id, prog: true, source: '進度', text: `進度 → ${pjStepName(p, to)}` });
+    render(); toast(to >= PJ_N() ? '專案結案' : `推進到「${pjStepName(p, to)}」`); if (window.Fog) Fog.stir(innerWidth / 2, innerHeight / 2, to >= PJ_N() ? 2.2 : 1);
+    server('advanceProject', p.id, to, ''); return; }
+  if (d.pjlog) { if (waitTmp(d.pjlog)) return; pjLogSheet(pjById(d.pjlog)); return; }
+  if (d.pjstage) { const p = pjById(S.projectId); if (!p || waitTmp(p.id)) return; pjLogSheet(p, Number(d.pjstage) === p.stage ? null : d.pjstage); return; }
+  if (d.pjpick) {
+    if (t.getAttribute('aria-disabled') === 'true') { toast('這已經是目前的關卡'); return; }
+    const on = t.getAttribute('aria-pressed') !== 'true';
+    t.parentElement.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+    t.setAttribute('aria-pressed', String(on)); S.pjPick = on ? d.pjpick : ''; return;
+  }
+  if (d.pjapply) {
+    const p = pjById(d.pjapply), noteEl = document.getElementById('pjLogNote'), note = noteEl.value.trim(), stage = S.pjPick;
+    if (stage === '' && !note) { toast('寫一句進度，或選一個關卡'); noteEl.focus(); return; }
+    if (stage !== '') p.stage = Number(stage); p.updated = S.today;
+    const line = stage !== '' ? `進度 → ${pjStepName(p, Number(stage))}${note ? '：' + note : ''}` : note;
+    S.items.push({ id: 'tmp' + Date.now(), date: S.today, time: stamp(new Date()).slice(11), cat: '業務', client: p.client, case: p.id, prog: true, source: '進度', text: line });
+    closeSheet(); render(); toast(stage !== '' ? `推進到「${pjStepName(p, Number(stage))}」` : '記下進度');
+    server('advanceProject', p.id, stage === '' ? '' : Number(stage), note); return;
+  }
+  if (d.toproj) { if (waitTmp(d.toproj)) return; const k = kase(d.toproj); if (k) toProjectSheet(k); return; }
+  if (d.toprojgo) {
+    const k = kase(d.toprojgo), name = document.getElementById('pjName').value.trim(), stage = S.pjPick === '' ? 1 : Number(S.pjPick), scale = S.pjScale;
+    if (!k) return;
+    // 先在畫面上搬好，伺服器回來後打開新專案
+    const tmp = 'tmpj' + Date.now();
+    (S.projects = S.projects || []).push({ id: tmp, client: k.client, name: name || k.action + '・' + k.product, scale, stage, created: k.created, updated: S.today, vendor: '', markup: '', tax: '外加', items: [], docs: {}, note: k.note || '' });
+    S.items.forEach(i => { if (i.case === k.id) i.case = tmp; });
+    S.cases = S.cases.filter(x => x.id !== k.id);
+    closeSheet(); S.view = 'projects'; S.projectId = null; S.clientId = null; S.anim = true; render(true); scrollTo(0, 0); toast('已轉成專案');
+    queued('caseToProject', k.id, name, scale, stage).then(st => { load(st); if (st.newProjectId) S.projectId = st.newProjectId; S.anim = true; render(true); })
+      .catch(e => { toast('沒轉成功：' + (e && e.message || '請稍後再試')); call('getState').then(st => { load(st); render(); }).catch(() => {}); });
+    return;
+  }
+  if (d.pjedit) { if (waitTmp(d.pjedit)) return; pjEditSheet(pjById(d.pjedit)); return; }
+  if (d.pjsave) {
+    const p = pjById(d.pjsave), cn = document.getElementById('ncClient').value.trim(), name = document.getElementById('pjName').value.trim(), note = document.getElementById('pjNote').value.trim();
+    if (!name) { toast('專案名稱不能空白'); document.getElementById('pjName').focus(); return; }
+    const old = client(p.client), moved = cn && (!old || old.name !== cn);
+    Object.assign(p, { name, scale: S.pjScale, note });
+    if (moved) { const c = S.clients.find(c => c.name === cn || c.alias.includes(cn)); if (c) p.client = c.id; }
+    closeSheet(); render(); toast('已修改專案'); server('editProject', p.id, { name, scale: S.pjScale, note, clientName: moved ? cn : '' }); return;
+  }
+  if (d.pjdel) { if (!t.classList.contains('arm')) { t.classList.add('arm'); t.textContent = '再按一次刪除專案'; return; }
+    S.projects = S.projects.filter(p => p.id !== d.pjdel); S.projectId = null; S.qDraft = null; closeSheet(); render(true); toast('已刪除專案'); server('deleteProject', d.pjdel); return; }
+  if (d.qadd !== undefined) { document.getElementById('qBody').insertAdjacentHTML('beforeend', quoteRow({ n: '', q: 1, u: '', c: '' })); quoteRecalc(); document.querySelector('#qBody tr:last-child input').focus(); return; }
+  if (d.qdel !== undefined) { const tr = t.closest('tr'); if (document.querySelectorAll('#qBody tr').length > 1) tr.remove(); else tr.querySelectorAll('input').forEach(i => { i.value = ''; }); quoteRecalc(); return; }
+  if (d.qsave) {
+    if (waitTmp(d.qsave)) return;
+    const p = pjById(d.qsave), q = quoteRead();
+    Object.assign(p, { vendor: q.vendor, markup: q.markup === '' ? '' : Number(q.markup), items: q.items.filter(x => x.n).map(x => ({ n: x.n, q: Number(x.q) || 0, u: x.u, c: Number(x.c) || 0, p: '' })) });
+    S.qDraft = null; render(); toast('報價已存檔'); server('saveQuote', p.id, q); return;
+  }
+  if (d.qcopy) { const q = quoteRead(); copyText(bcrmText({ items: q.items.filter(x => x.n), markup: q.markup }), '已複製品項明細'); return; }
+  if (d.gendoc) {
+    if (waitTmp(d.gendoc)) return;
+    // 報價試算還沒存檔就先存，文件才會用到剛填的品項
+    const draft = document.getElementById('quote') ? quoteRead() : null, p = pjById(d.gendoc);
+    const dirty = draft && JSON.stringify(draft.items.filter(x => x.n).map(x => [x.n, +x.q || 0, x.u, +x.c || 0])) !== JSON.stringify(p.items.map(x => [x.n, +x.q || 0, x.u, +x.c || 0]));
+    const kind = d.kind, fn = kind === '報價單' ? 'generateQuote' : 'generateAcceptance';
+    t.disabled = true; t.querySelector('span').textContent = '產生中…';
+    (dirty || (draft && String(draft.markup) !== String(p.markup)) ? queued('saveQuote', p.id, draft) : Promise.resolve())
+      .then(() => queued(fn, d.gendoc)).then(st => { S.qDraft = null; load(st); render(); toast(kind + '產生好了'); })
+      .catch(e => { render(); const m = String(e && e.message || e); toast(/授權|authoriz|permission|權限/i.test(m) ? '還沒授權產生文件：請在 Apps Script 編輯器執行一次 authorizeDocs' : m); });
+    return;
+  }
+  if (d.invcopy) { copyText(invoiceText(pjById(d.invcopy)), '已複製給祐芹姐的訊息'); return; }
+  if (d.attach) { const it = itemFor(d.attach); if (it) caseSheet(it); return; }
+  if (d.link) {
+    const kid = d.link, it = live(S.ncItem), k = kase(kid);
+    Object.assign(it, {case:kid, cat:'業務', source:'手動', pending:false, fresh:true}); k.updated=S.today;
+    S.flash=['業務']; S.bump=['業務']; S.adv=kid; closeSheet(); render(); toast(`已歸到 ${k.action}・${k.product}`);
+    serverItem(it, 'linkItem', kid); askForms(kid) || nextConfirm(); return;
+  }
+  if (d.ncc) { document.getElementById('ncClient').value = d.ncc; renderSug(); return; }
+  if (d.addopt) {
+    const box = document.getElementById('optNew-' + d.addopt), open = box.hidden;
+    box.hidden = !open; t.setAttribute('aria-expanded', String(open));
+    if (open) document.getElementById('optIn-' + d.addopt).focus();
+    return;
+  }
+  if (d.optsave) {
+    const kind = d.optsave, o = OPT[kind], inp = document.getElementById('optIn-' + kind), v = inp.value.trim();
+    if (!v) { inp.focus(); return; }
+    const list = o.list();
+    if (!list.includes(v)) { const at = list.indexOf('其他'); at >= 0 ? list.splice(at, 0, v) : list.push(v); server('addOption', o.type, v); toast(`已新增${o.label}「${v}」`); }
+    S.nc[kind] = v;
+    // 只重畫這一排，抽屜裡其他已經填的東西不動
+    const row = document.getElementById('pick-' + kind).previousElementSibling;
+    document.getElementById('pick-' + kind).remove(); document.getElementById('optNew-' + kind).remove();
+    row.insertAdjacentHTML('afterend', pickRow(kind)); row.remove();
+    return;
+  }
+  if (d.na || d.np) { S.nc[d.na?'a':'p'] = d.na || d.np; t.parentElement.querySelectorAll('button:not(.add-opt)').forEach(b => b.setAttribute('aria-pressed', b===t)); return; }
+  if (d.newcase !== undefined) {
+    const it = S.ncItem ? live(S.ncItem) : null, step = S.pstep;
+    const cEl = document.getElementById('ncClient'), cn = cEl ? cEl.value.trim() : '', note = document.getElementById('ncNote').value.trim();
+    if (!S.nc.a || !S.nc.p) { toast('先選動作和產品'); return; }
+    if (!(it && it.client) && !cn) { toast('先填客戶'); cEl.focus(); return; }
+    // 先在畫面上建好，伺服器回來再換成正式資料
+    let cid = it && it.client;
+    if (!cid) { const c = S.clients.find(c => c.name===cn || c.alias.includes(cn)); cid = c ? c.id : 'tmpc'+Date.now(); if (!c) S.clients.push({id:cid, name:cn, alias:[]}); }
+    const kid = 'tmpk'+Date.now(), now = stamp(new Date()).slice(11);
+    const status = step ? (S.stepStatus[step] || '進行中') : '進行中';
+    S.cases.push({id:kid, client:cid, action:S.nc.a, product:S.nc.p, progress:step || '處理中', status, created:S.today, updated:S.today, note});
+    if (it) Object.assign(it, {case:kid, client:cid, cat:'業務', source:'手動', pending:false, fresh:true});
+    const detail = [step ? shortStep(step) : '', note].filter(Boolean).join('：');
+    if (!it || note || step) S.items.push({id:'tmp'+Date.now(), date:S.today, time:now, cat:'業務', client:cid, case:kid, prog:true, source:'進度', fresh:true,
+      text: it ? (step ? `進度 → ${detail}` : note) : `開新案件${detail?'：'+detail:''}`});
+    const [a, p] = [S.nc.a, S.nc.p];
+    S.flash=['業務']; S.bump=['業務']; S.adv=kid; closeSheet(); render(); toast(`新案件：${a}・${p}`);
+    if (it) serverItem(it, 'createCase', a, p, cn, note, step); else server('createCase', '', a, p, cn, note, step);
+    askForms(kid) || nextConfirm(); return;
+  }
+  if (d.resolve) {
+    const p = S.pending.find(x=>x.id===d.resolve); p.done = '處理中…';
+    // 分類類的待確認：紀錄立刻搬到選的那一欄，不等伺服器
+    const it = p.item && S.items.find(i => i.id===p.item);
+    if (it && CATS.includes(d.val)) {
+      if (it.cat !== d.val) { if (d.val!=='業務') it.case=''; it.cat=d.val; it.fresh=true; S.flash=[d.val]; S.bump=[d.val]; }
+      it.pending = false; p.done = `已歸到「${d.val}」`;
+    }
+    render();
+    server('resolvePending', d.resolve, d.val); return;
+  }
+  if (d.setcat) {
+    const it = itemFor(d.setcat); if (!it) return;
+    if (it.cat !== d.v) {
+      // 改成待辦＝進待辦清單；從待辦改走＝拿掉那條沒做完的（伺服器 syncTodoForItem_ 同一套）
+      if (d.v === '待辦') (S.todos = S.todos || []).push({ id: 'tmpt' + Date.now(), text: it.text, due: '', done: '', created: stamp(new Date()) });
+      else if (it.cat === '待辦') S.todos = (S.todos || []).filter(x => !(x.text === it.text && !x.done));
+      if (d.v!=='業務') it.case=''; it.cat=d.v; S.flash=[d.v]; S.bump=[d.v];
+    }
+    Object.assign(it, {source:'手動', pending:false, fresh:true}); render(); toast(`已改成「${d.v}」`);
+    serverItem(it, 'setCategory', d.v);
+    if (d.v==='業務' && !it.case) { S.confirmQ = [it]; nextConfirm(); }
+    return;
+  }
+  if (d.edit) {
+    const it = itemFor(d.edit); if (!it) return;
+    S.back = t.closest('.sheet') ? S.sheetCase : null;
+    sheet(`<h3>修改</h3><label for="edText">內容</label><textarea id="edText" rows="3">${esc(it.text)}</textarea>
+      <div class="sheet-foot">${B('存檔','',`data-save="${it.id}"`)}${B('取消','ghost sm','data-close')}</div>`);
+    return;
+  }
+  if (d.save) {
+    const it = itemFor(d.save), el = document.getElementById('edText'), v = el.value.trim(); if (!it) return;
+    if (!v) { el.focus(); return; }
+    const back = S.back; S.back = null;
+    Object.assign(it, {text:v, fresh:true}); closeSheet(); render(); toast('已修改');
+    if (back) progSheet(kase(back));
+    serverItem(it, 'editItem', v); return;
+  }
+  if (d.del) {
+    const it = itemFor(d.del); if (!it) return;
+    const back = t.closest('.sheet') ? S.sheetCase : null;
+    S.items = S.items.filter(i => i !== it); render(); toast('已刪除');
+    if (back) progSheet(kase(back));
+    serverItem(it, 'deleteItem'); return;
+  }
+  if (d.delrec) {
+    if (d.delrec.startsWith('q:')) { writeQueue(readQueue().filter(r => 'q:'+r.sendId !== d.delrec)); render(); toast('已刪除'); return; }
+    S.records = S.records.filter(r => r.id !== d.delrec); S.items = S.items.filter(i => i.recordId !== d.delrec);
+    render(); toast('已刪除'); server('deleteRecord', d.delrec); return;
+  }
+});
+document.addEventListener('submit', e => {
+  if (e.target.id === 'keyForm') {
+    e.preventDefault();
+    const v = document.getElementById('keyInput').value.trim(); if (!v) return;
+    store.set(TOKEN_KEY, v); S.anim = true; boot(); return;
+  }
+  if (e.target.id === 'fileSearch') {
+    e.preventDefault();
+    const v = document.getElementById('fq').value.trim(); if (!v) { document.getElementById('fq').focus(); return; }
+    searchSheet(v); return;
+  }
+  if (e.target.id === 'todoForm') {
+    e.preventDefault();
+    const inp = document.getElementById('todoIn'), v = inp.value.trim(), due = document.getElementById('todoDue').value;
+    if (!v) { inp.focus(); return; }
+    (S.todos = S.todos || []).push({ id: 'tmp' + Date.now(), text: v, due, done: '', created: stamp(new Date()) });
+    // 先清空再重畫：重畫時會把輸入框裡還在的字填回去
+    inp.value = ''; document.getElementById('todoDue').value = '';
+    render(); document.getElementById('todoIn')?.focus(); server('addTodo', v, due); return;
+  }
+  if (e.target.id !== 'capForm') return; e.preventDefault();
+  const ta = document.getElementById('cap'), text = ta.value.trim(); if (!text) { ta.focus(); return; }
+  const rec = { sendId: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2,7), text, time: stamp(new Date()) };
+  const segs = roughSplit(text);
+  S.clearDraft = true;
+  if (!navigator.onLine) { writeQueue([...readQueue(), rec]); render(); toast('沒有網路，先存在這台裝置'); return; }
+  segs.forEach((s,n) => S.items.push({id:'tmp'+Date.now()+n, tmp:rec.sendId, n, date:S.today, time:rec.time.slice(11), cat:s.cat, client:s.client, text:s.text, source:'暫分', fresh:true}));
+  segs.filter(s => s.cat === '待辦').forEach((s, n) => (S.todos = S.todos || []).push({ id: 'tmpt' + Date.now() + n, text: s.text, due: '', done: '', created: rec.time }));
+  S.flash = S.bump = [...new Set(segs.map(s=>s.cat))];
+  const mine = S.items.filter(i => i.tmp === rec.sendId);
+  render();
+  S.confirmQ = mine.filter(i => i.cat==='業務');
+  if (S.confirmQ.length) setTimeout(nextConfirm, 380);
+  if (window.Fog) { const r = e.target.getBoundingClientRect(); Fog.stir(r.left + r.width / 2, r.top + 40, 1.4); }
+  toast(`分進 ${segs.length} 格`);
+  if (!S.confirmQ.length) setTimeout(() => document.querySelector('.today-band')?.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block:'start'}), 450);
+  const openBefore = new Set(S.cases.filter(k => k.status!=='已結案').map(k => k.id));
+  queued('addRecord', rec.sendId, rec.text, rec.time)
+    .then(async st => {
+      load(st);
+      // 伺服器回來前就對剛記下的紀錄做了操作（改分類、刪除……）：換成真的 id 依序補送，做完才重畫，畫面不會跳回去
+      const ops = S.later[rec.sendId]; delete S.later[rec.sendId];
+      const r = S.records.find(r => r.raw===rec.text && r.time===rec.time);
+      const ids = r ? S.items.filter(i => i.recordId===r.id).map(i => i.id) : [];
+      mine.forEach(t => { if (ids[t.n]) S.realId[t.id] = ids[t.n]; });
+      if (ops) {
+        for (const o of ops) if (ids[o.n]) { try { load(await call(o.fn, ids[o.n], ...o.rest)); } catch (e) { toast('有一項操作沒存到：' + e.message); } }
+      }
+      const fin = S.cases.find(k => k.status==='已結案' && openBefore.has(k.id));
+      if (fin) { S.justClosed = fin.id; S.adv = fin.id; }
+      render();
+      if (fin) { toast('最終回！案件完結'); document.querySelector('.panel.just')?.scrollIntoView({behavior:'smooth', block:'center'}); }
+    })
+    .catch(() => { delete S.later[rec.sendId]; writeQueue([...readQueue(), rec]); render(); toast('沒送出去，已先存在這台裝置，稍後自動補送'); });
+});
+document.addEventListener('input', e => { if (e.target.id==='cap') syncMirror(!e.isComposing && !cmp, !!cmp); if (e.target.id==='ncClient') renderSug(); if (e.target.closest && e.target.closest('#quote')) quoteRecalc(); if (e.target.id==='q') { S.q=e.target.value; const p=e.target.selectionStart; render(); const i=document.getElementById('q'); i.focus(); i.setSelectionRange(p,p); } });
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') { closeSheet(); closeMenus(); return; }
+  // 電腦上打長紀錄：Ctrl（Mac 是 Cmd）＋Enter 直接記下來
+  if (e.target.id==='cap' && e.key==='Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); document.getElementById('capForm').requestSubmit(); return; }
+  // 新增選項的輸入框按 Enter 直接加入
+  if (e.key==='Enter' && e.target.id && e.target.id.startsWith('optIn-')) { e.preventDefault(); document.querySelector(`[data-optsave="${e.target.id.slice(6)}"]`).click(); return; }
+  const row = e.target.closest && e.target.closest('[data-menu]');
+  if (row && e.target === row && (e.key==='Enter' || e.key===' ')) { e.preventDefault(); toggleMenu(row); }
+});
+addEventListener('offline', () => render());
+boot();
+</script>
+
+</body></html>
